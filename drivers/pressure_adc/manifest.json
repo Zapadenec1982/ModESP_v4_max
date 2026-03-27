@@ -1,0 +1,75 @@
+{
+  "manifest_version": 1,
+  "driver": "pressure_adc",
+  "description": "Ratiometric pressure sensor via ADC (0.5-4.5V → 0-Pmax bar)",
+  "category": "sensor",
+  "hardware_type": "adc_channel",
+  "requires_address": false,
+  "multiple_per_bus": false,
+  "provides": {
+    "type": "float",
+    "unit": "bar",
+    "range": [0, 60]
+  },
+  "settings": [
+    {
+      "key": "v_min",
+      "type": "float",
+      "default": 0.5,
+      "min": 0.0,
+      "max": 3.3,
+      "step": 0.01,
+      "unit": "V",
+      "description": "Voltage at 0 bar (ratiometric offset)"
+    },
+    {
+      "key": "v_max",
+      "type": "float",
+      "default": 4.5,
+      "min": 1.0,
+      "max": 5.0,
+      "step": 0.01,
+      "unit": "V",
+      "description": "Voltage at max pressure (ratiometric full scale)"
+    },
+    {
+      "key": "max_pressure",
+      "type": "float",
+      "default": 50.0,
+      "min": 1.0,
+      "max": 100.0,
+      "step": 0.1,
+      "unit": "bar",
+      "description": "Full scale pressure (sensor range)"
+    },
+    {
+      "key": "offset",
+      "type": "float",
+      "default": 0.0,
+      "min": -5.0,
+      "max": 5.0,
+      "step": 0.01,
+      "unit": "bar",
+      "description": "Calibration offset"
+    },
+    {
+      "key": "filter_alpha",
+      "type": "float",
+      "default": 0.15,
+      "min": 0.01,
+      "max": 1.0,
+      "step": 0.01,
+      "description": "IIR filter coefficient (0.01=heavy, 1.0=none)"
+    },
+    {
+      "key": "read_interval_ms",
+      "type": "int",
+      "default": 500,
+      "min": 100,
+      "max": 5000,
+      "step": 100,
+      "unit": "ms",
+      "description": "ADC read interval"
+    }
+  ]
+}

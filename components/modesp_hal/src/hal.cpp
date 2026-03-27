@@ -10,7 +10,7 @@
 #include "esp_log.h"
 #include "esp_adc/adc_oneshot.h"
 
-static const char* TAG = "HAL";
+static const char TAG[] = "HAL";
 
 namespace modesp {
 

@@ -19,11 +19,12 @@
 #include "relay_driver.h"
 #include "digital_input_driver.h"
 #include "ntc_driver.h"
+#include "pressure_adc_driver.h"
 #include "pcf8574_relay_driver.h"
 #include "pcf8574_input_driver.h"
 #include "esp_log.h"
 
-static const char* TAG = "DriverMgr";
+static const char TAG[] = "DriverMgr";
 
 namespace modesp {
 
@@ -39,6 +40,9 @@ static size_t di_count = 0;
 
 static NtcDriver ntc_pool[MAX_SENSORS];
 static size_t ntc_count = 0;
+
+static PressureAdcDriver pressure_pool[MAX_SENSORS];
+static size_t pressure_count = 0;
 
 static RelayDriver relay_pool[MAX_ACTUATORS];
 static size_t relay_count = 0;
@@ -106,6 +110,8 @@ bool DriverManager::init(const BindingTable& bindings, HAL& hal) {
             ok = add_sensor(create_di_sensor(binding, hal), binding);
         } else if (binding.driver_type == "ntc") {
             ok = add_sensor(create_ntc_sensor(binding, hal), binding);
+        } else if (binding.driver_type == "pressure_adc") {
+            ok = add_sensor(create_pressure_sensor(binding, hal), binding);
         } else if (binding.driver_type == "relay") {
             ok = add_actuator(create_actuator(binding, hal), binding);
         } else if (binding.driver_type == "pcf8574_relay") {
@@ -220,6 +226,24 @@ ISensorDriver* DriverManager::create_ntc_sensor(const Binding& binding, HAL& hal
     }
 
     auto& drv = ntc_pool[ntc_count++];
+    drv.configure(binding.role.c_str(), adc_res->gpio, adc_res->atten);
+    return &drv;
+}
+
+ISensorDriver* DriverManager::create_pressure_sensor(const Binding& binding, HAL& hal) {
+    if (pressure_count >= MAX_SENSORS) {
+        ESP_LOGE(TAG, "Pressure pool exhausted");
+        return nullptr;
+    }
+
+    auto* adc_res = hal.find_adc_channel(
+        etl::string_view(binding.hardware_id.c_str(), binding.hardware_id.size()));
+    if (!adc_res) {
+        ESP_LOGE(TAG, "ADC channel '%s' not found in HAL", binding.hardware_id.c_str());
+        return nullptr;
+    }
+
+    auto& drv = pressure_pool[pressure_count++];
     drv.configure(binding.role.c_str(), adc_res->gpio, adc_res->atten);
     return &drv;
 }

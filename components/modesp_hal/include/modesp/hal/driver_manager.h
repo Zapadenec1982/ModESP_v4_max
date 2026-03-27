@@ -64,6 +64,7 @@ private:
     ISensorDriver*   create_sensor(const Binding& binding, HAL& hal);
     ISensorDriver*   create_di_sensor(const Binding& binding, HAL& hal);
     ISensorDriver*   create_ntc_sensor(const Binding& binding, HAL& hal);
+    ISensorDriver*   create_pressure_sensor(const Binding& binding, HAL& hal);
     IActuatorDriver* create_actuator(const Binding& binding, HAL& hal);
     IActuatorDriver* create_pcf_actuator(const Binding& binding, HAL& hal);
     ISensorDriver*   create_pcf_sensor(const Binding& binding, HAL& hal);
