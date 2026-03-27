@@ -1,0 +1,13 @@
+{
+  "state.lighting.mode.description": "Beleuchtungsmodus",
+  "state.lighting.mode.options.0": "Aus",
+  "state.lighting.mode.options.1": "Ein",
+  "state.lighting.mode.options.2": "Auto (Tag/Nacht)",
+  "state.lighting.state.description": "Beleuchtungszustand",
+  "state.lighting.state.on_label": "Ein",
+  "state.lighting.state.off_label": "Aus",
+  "state.lighting.req.light.description": "Beleuchtungsanforderung",
+  "page.lighting.title": "Beleuchtung",
+  "card.lighting.card0.title": "Kammerbeleuchtung",
+  "card.lighting.card0.subtitle": "Modus und Status"
+}

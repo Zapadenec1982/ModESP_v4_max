@@ -1,0 +1,13 @@
+{
+  "state.lighting.mode.description": "Tryb oświetlenia",
+  "state.lighting.mode.options.0": "Wyłączone",
+  "state.lighting.mode.options.1": "Włączone",
+  "state.lighting.mode.options.2": "Auto (dzień/noc)",
+  "state.lighting.state.description": "Stan oświetlenia",
+  "state.lighting.state.on_label": "Włączone",
+  "state.lighting.state.off_label": "Wyłączone",
+  "state.lighting.req.light.description": "Żądanie oświetlenia",
+  "page.lighting.title": "Oświetlenie",
+  "card.lighting.card0.title": "Oświetlenie komory",
+  "card.lighting.card0.subtitle": "Tryb i status"
+}

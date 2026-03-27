@@ -1,0 +1,22 @@
+{
+  "project": "cold_room_v1",
+  "version": "1.0.0",
+  "description": "Холодильна камера — базова конфігурація",
+  "modules": [
+    "equipment",
+    "protection",
+    "thermostat",
+    "defrost",
+    "lighting",
+    "datalogger"
+  ],
+  "system": {
+    "device_name": "ModESP",
+    "pages": {
+      "dashboard": true,
+      "network": true,
+      "firmware": true,
+      "system": true
+    }
+  }
+}

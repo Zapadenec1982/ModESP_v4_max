@@ -1,0 +1,93 @@
+{
+  "manifest_version": 1,
+  "module": "lighting",
+  "version": "1.0.0",
+  "description": "Chamber lighting control — OFF/ON/Auto (day-night ECO)",
+  "priority": 2,
+
+  "inputs": {
+    "thermostat.night_active": {
+      "source_module": "thermostat",
+      "type": "bool",
+      "description": "Night mode active flag from thermostat",
+      "optional": true
+    },
+    "equipment.light": {
+      "source_module": "equipment",
+      "type": "bool",
+      "description": "Actual light relay state from Equipment Manager",
+      "optional": true
+    }
+  },
+
+  "features": {
+    "basic_lighting": {
+      "description": "Керування освітленням камери",
+      "requires_roles": ["light"],
+      "controls_settings": ["lighting.mode"]
+    }
+  },
+
+  "state": {
+    "lighting.mode": {
+      "type": "int",
+      "access": "readwrite",
+      "default": 0,
+      "persist": true,
+      "options": [
+        {"value": 0, "label": "Вимкнено"},
+        {"value": 1, "label": "Увімкнено"},
+        {"value": 2, "label": "Авто (день/ніч)"}
+      ],
+      "description": "Режим освітлення"
+    },
+    "lighting.state": {
+      "type": "bool",
+      "access": "read",
+      "description": "Фактичний стан освітлення",
+      "on_label": "Увімкнено",
+      "off_label": "Вимкнено"
+    },
+    "lighting.req.light": {
+      "type": "bool",
+      "access": "read",
+      "description": "Запит на освітлення"
+    }
+  },
+
+  "mqtt": {
+    "publish": [
+      "lighting.state",
+      "lighting.mode"
+    ],
+    "subscribe": [
+      "lighting.mode"
+    ]
+  },
+
+  "ui": {
+    "page": "Освітлення",
+    "page_id": "lighting",
+    "icon": "sun",
+    "cards": [
+      {
+        "title": "Освітлення камери",
+        "icon": "sun",
+        "icon_color": "yellow",
+        "subtitle": "Режим та стан",
+        "widgets": [
+          {
+            "key": "lighting.state",
+            "widget": "indicator",
+            "on_color": "#eab308",
+            "off_color": "#64748b"
+          },
+          {
+            "key": "lighting.mode",
+            "widget": "select"
+          }
+        ]
+      }
+    ]
+  }
+}

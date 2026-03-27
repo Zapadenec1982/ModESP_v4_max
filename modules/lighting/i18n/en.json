@@ -1,0 +1,13 @@
+{
+  "state.lighting.mode.description": "Lighting mode",
+  "state.lighting.mode.options.0": "Off",
+  "state.lighting.mode.options.1": "On",
+  "state.lighting.mode.options.2": "Auto (day/night)",
+  "state.lighting.state.description": "Light state",
+  "state.lighting.state.on_label": "On",
+  "state.lighting.state.off_label": "Off",
+  "state.lighting.req.light.description": "Light request",
+  "page.lighting.title": "Lighting",
+  "card.lighting.card0.title": "Chamber Lighting",
+  "card.lighting.card0.subtitle": "Mode and status"
+}
