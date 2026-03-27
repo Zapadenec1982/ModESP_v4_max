@@ -42,6 +42,7 @@ include_directories(
     "${ROOT}/modules/protection/include"                    # protection_module.h
     "${ROOT}/modules/equipment/include"                     # equipment_module.h
     "${ROOT}/modules/datalogger/include"                    # datalogger_module.h
+    "${ROOT}/components/modesp_refrigerant/include"           # modesp/refrigerant/saturation.h
     "${CMAKE_SOURCE_DIR}"                                   # for #include "doctest.h"
 )
 
@@ -70,6 +71,8 @@ set(TEST_SOURCES
     "${CMAKE_SOURCE_DIR}/test_protection.cpp"
     "${CMAKE_SOURCE_DIR}/test_equipment.cpp"
     "${CMAKE_SOURCE_DIR}/test_datalogger.cpp"
+    "${CMAKE_SOURCE_DIR}/test_saturation.cpp"
+    "${ROOT}/components/modesp_refrigerant/src/saturation.cpp"
 )
 
 add_executable(test_runner
