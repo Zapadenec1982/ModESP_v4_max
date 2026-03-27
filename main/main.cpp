@@ -46,6 +46,11 @@
   #include "modesp/net/mqtt_service.h"
 #endif
 
+// Modbus RTU Slave (optional, compile-time Kconfig)
+#if defined(CONFIG_MODESP_MODBUS_ENABLED)
+  #include "modesp/modbus/modbus_service.h"
+#endif
+
 // Equipment Layer + Business modules
 #include "equipment_module.h"
 #include "protection_module.h"
@@ -91,6 +96,11 @@ static modesp::WsService       ws_service;
 static modesp::AwsIotService   cloud_service;
 #else
 static modesp::MqttService     cloud_service;
+#endif
+
+// Modbus RTU Slave (optional)
+#if defined(CONFIG_MODESP_MODBUS_ENABLED)
+static modesp::ModbusService   modbus_service;
 #endif
 
 // Equipment Layer (CRITICAL priority — owns all HAL drivers)
@@ -200,6 +210,11 @@ extern "C" void app_main(void)
     cloud_service.set_backfill_provider(&datalogger);
     app.modules().register_module(cloud_service);
 
+#if defined(CONFIG_MODESP_MODBUS_ENABLED)
+    modbus_service.set_state(&app.state());
+    app.modules().register_module(modbus_service);
+#endif
+
     // ── Step 5: Initialize HAL (GPIO setup) ──
     if (!hal.init(board_cfg)) {
         ESP_LOGE(TAG, "HAL init failed!");
@@ -284,6 +299,9 @@ extern "C" void app_main(void)
     if (http_service.server()) {
         ws_service.set_http_server(http_service.server());
         cloud_service.set_http_server(http_service.server());
+#if defined(CONFIG_MODESP_MODBUS_ENABLED)
+        modbus_service.set_http_server(http_service.server());
+#endif
         http_service.register_static_handler();  // Must be last (wildcard catch-all)
     } else {
         ESP_LOGW(TAG, "HTTP server not started, WebSocket unavailable");

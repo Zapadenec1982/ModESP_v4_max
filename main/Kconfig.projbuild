@@ -33,4 +33,11 @@ menu "ModESP Configuration"
         config MODESP_CLOUD_AWS
             bool "AWS IoT Core"
     endchoice
+    config MODESP_MODBUS_ENABLED
+        bool "Enable Modbus RTU Slave (RS-485)"
+        default n
+        help
+            Enables Modbus RTU Slave on UART1 via RS-485 (KC868-A6).
+            Register map auto-generated from module manifests.
+            Adds ~15KB RAM, ~23KB Flash.
 endmenu

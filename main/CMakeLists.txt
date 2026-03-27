@@ -12,3 +12,9 @@ else()
     idf_component_get_property(main_lib ${COMPONENT_NAME} COMPONENT_LIB)
     target_link_libraries(${main_lib} PRIVATE idf::modesp_mqtt)
 endif()
+
+# Modbus RTU Slave: compile-time Kconfig choice
+if(CONFIG_MODESP_MODBUS_ENABLED)
+    idf_component_get_property(main_lib ${COMPONENT_NAME} COMPONENT_LIB)
+    target_link_libraries(${main_lib} PRIVATE idf::modesp_modbus)
+endif()
