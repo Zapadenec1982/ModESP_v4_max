@@ -36,30 +36,30 @@ ThermostatModule::ThermostatModule()
 // ═══════════════════════════════════════════════════════════════
 
 void ThermostatModule::sync_settings() {
-    setpoint_     = read_float("thermostat.setpoint", setpoint_);
-    differential_ = read_float("thermostat.differential", differential_);
+    setpoint_     = read_float(ns_key("setpoint"), setpoint_);
+    differential_ = read_float(ns_key("differential"), differential_);
 
     // Цілочисельні параметри (хвилини → мілісекунди)
-    min_off_ms_       = static_cast<uint32_t>(read_int("thermostat.min_off_time", 3)) * 60000;
-    min_on_ms_        = static_cast<uint32_t>(read_int("thermostat.min_on_time", 2)) * 60000;
-    startup_delay_ms_ = static_cast<uint32_t>(read_int("thermostat.startup_delay", 1)) * 60000;
-    evap_fan_mode_    = read_int("thermostat.evap_fan_mode", 1);
-    fan_stop_temp_    = read_float("thermostat.fan_stop_temp", fan_stop_temp_);
-    fan_stop_hyst_    = read_float("thermostat.fan_stop_hyst", fan_stop_hyst_);
-    cond_fan_delay_ms_ = static_cast<uint32_t>(read_int("thermostat.cond_fan_delay", 30)) * 1000;
+    min_off_ms_       = static_cast<uint32_t>(read_int(ns_key("min_off_time"), 3)) * 60000;
+    min_on_ms_        = static_cast<uint32_t>(read_int(ns_key("min_on_time"), 2)) * 60000;
+    startup_delay_ms_ = static_cast<uint32_t>(read_int(ns_key("startup_delay"), 1)) * 60000;
+    evap_fan_mode_    = read_int(ns_key("evap_fan_mode"), 1);
+    fan_stop_temp_    = read_float(ns_key("fan_stop_temp"), fan_stop_temp_);
+    fan_stop_hyst_    = read_float(ns_key("fan_stop_hyst"), fan_stop_hyst_);
+    cond_fan_delay_ms_ = static_cast<uint32_t>(read_int(ns_key("cond_fan_delay"), 30)) * 1000;
 
     // Хвилини → мілісекунди
-    safety_on_ms_  = static_cast<uint32_t>(read_int("thermostat.safety_run_on", 20)) * 60000;
-    safety_off_ms_ = static_cast<uint32_t>(read_int("thermostat.safety_run_off", 10)) * 60000;
+    safety_on_ms_  = static_cast<uint32_t>(read_int(ns_key("safety_run_on"), 20)) * 60000;
+    safety_off_ms_ = static_cast<uint32_t>(read_int(ns_key("safety_run_off"), 10)) * 60000;
 
     // Нічний режим
-    night_setback_   = read_float("thermostat.night_setback", night_setback_);
-    night_mode_      = read_int("thermostat.night_mode", 0);
-    night_start_     = read_int("thermostat.night_start", 22);
-    night_end_       = read_int("thermostat.night_end", 6);
+    night_setback_   = read_float(ns_key("night_setback"), night_setback_);
+    night_mode_      = read_int(ns_key("night_mode"), 0);
+    night_start_     = read_int(ns_key("night_start"), 22);
+    night_end_       = read_int(ns_key("night_end"), 6);
 
     // Дисплей під час відтайки
-    display_defrost_ = read_int("thermostat.display_defrost", 1);
+    display_defrost_ = read_int(ns_key("display_defrost"), 1);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -86,10 +86,10 @@ bool ThermostatModule::is_night_active() {
         case 2:
             // Через дискретний вхід
             if (!has_feature("night_di")) return false;
-            return read_bool("equipment.night_input");
+            return read_input_bool("equipment.night_input");
         case 3:
             // Вручну — через SharedState
-            return read_bool("thermostat.night_active");
+            return read_bool(ns_key("night_active"));
         default:
             return false;
     }
@@ -105,7 +105,7 @@ void ThermostatModule::request_compressor(bool on) {
         // Скидаємо обидва таймери при зміні стану
         comp_on_time_ms_ = 0;
         comp_off_time_ms_ = 0;
-        state_set("thermostat.req.compressor", on);
+        state_set(ns_key("req.compressor"), on);
         ESP_LOGI(TAG, "Request compressor %s", on ? "ON" : "OFF");
     }
 }
@@ -113,14 +113,14 @@ void ThermostatModule::request_compressor(bool on) {
 void ThermostatModule::request_evap_fan(bool on) {
     if (evap_fan_on_ != on) {
         evap_fan_on_ = on;
-        state_set("thermostat.req.evap_fan", on);
+        state_set(ns_key("req.evap_fan"), on);
     }
 }
 
 void ThermostatModule::request_cond_fan(bool on) {
     if (cond_fan_on_ != on) {
         cond_fan_on_ = on;
-        state_set("thermostat.req.cond_fan", on);
+        state_set(ns_key("req.cond_fan"), on);
     }
 }
 
@@ -170,7 +170,7 @@ void ThermostatModule::enter_state(State new_state) {
             break;
     }
 
-    state_set("thermostat.state", state_name());
+    state_set(ns_key("state"), state_name());
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -182,18 +182,18 @@ bool ThermostatModule::on_init() {
     sync_settings();
 
     // Публікуємо початковий стан
-    state_set("thermostat.temperature", 0.0f);
-    state_set("thermostat.setpoint", setpoint_);
-    state_set("thermostat.differential", differential_);
-    state_set("thermostat.req.compressor", false);
-    state_set("thermostat.req.evap_fan", false);
-    state_set("thermostat.req.cond_fan", false);
-    state_set("thermostat.state", "startup");
-    state_set("thermostat.comp_on_time", static_cast<int32_t>(0));
-    state_set("thermostat.comp_off_time", static_cast<int32_t>(0));
-    state_set("thermostat.night_active", false);
-    state_set("thermostat.effective_setpoint", setpoint_);
-    state_set("thermostat.display_temp", 0.0f);
+    state_set(ns_key("temperature"), 0.0f);
+    state_set(ns_key("setpoint"), setpoint_);
+    state_set(ns_key("differential"), differential_);
+    state_set(ns_key("req.compressor"), false);
+    state_set(ns_key("req.evap_fan"), false);
+    state_set(ns_key("req.cond_fan"), false);
+    state_set(ns_key("state"), "startup");
+    state_set(ns_key("comp_on_time"), static_cast<int32_t>(0));
+    state_set(ns_key("comp_off_time"), static_cast<int32_t>(0));
+    state_set(ns_key("night_active"), false);
+    state_set(ns_key("effective_setpoint"), setpoint_);
+    state_set(ns_key("display_temp"), 0.0f);
 
     ESP_LOGI(TAG, "Initialized (setpoint=%.1f°C, differential=%.1f°C, state=startup)",
              setpoint_, differential_);
@@ -217,19 +217,19 @@ void ThermostatModule::on_update(uint32_t dt_ms) {
     sync_settings();
 
     // 2. Читаємо inputs з SharedState
-    current_temp_ = read_float("equipment.air_temp");
-    evap_temp_    = read_float("equipment.evap_temp");
-    sensor1_ok_   = read_bool("equipment.sensor1_ok");
-    sensor2_ok_   = read_bool("equipment.sensor2_ok");
-    defrost_active_ = read_bool("defrost.active");
-    protection_lockout_ = read_bool("protection.lockout");
+    current_temp_ = read_input_float("equipment.air_temp");
+    evap_temp_    = read_input_float("equipment.evap_temp");
+    sensor1_ok_   = read_input_bool("equipment.sensor1_ok");
+    sensor2_ok_   = read_input_bool("equipment.sensor2_ok");
+    defrost_active_ = read_input_bool("defrost.active");
+    protection_lockout_ = read_input_bool("protection.lockout");
 
     // 3. Дзеркало температури для UI/MQTT
     if (sensor1_ok_) {
-        state_set("thermostat.temperature", current_temp_);
+        state_set(ns_key("temperature"), current_temp_);
     } else {
-        state_set("thermostat.temperature", NAN);
-        state_set("thermostat.display_temp", NAN);
+        state_set(ns_key("temperature"), NAN);
+        state_set(ns_key("display_temp"), NAN);
     }
 
     // 3a. Нічний режим — обчислюємо effective_setpoint
@@ -237,13 +237,13 @@ void ThermostatModule::on_update(uint32_t dt_ms) {
     night_active_ = is_night_active();
     effective_sp_ = setpoint_ + (night_active_ ? night_setback_ : 0.0f);
     if (night_active_ != was_night) {
-        state_set("thermostat.night_active", night_active_);
+        state_set(ns_key("night_active"), night_active_);
         ESP_LOGI(TAG, "Night mode %s (effective SP=%.1f°C)",
                  night_active_ ? "ON" : "OFF", effective_sp_);
     }
     // Публікуємо тільки при зміні — уникаємо зайвих version bumps
     if (effective_sp_ != last_effective_sp_) {
-        state_set("thermostat.effective_setpoint", effective_sp_);
+        state_set(ns_key("effective_setpoint"), effective_sp_);
         last_effective_sp_ = effective_sp_;
     }
 
@@ -259,14 +259,14 @@ void ThermostatModule::on_update(uint32_t dt_ms) {
             request_cond_fan(false);
             // Фіксуємо T для display_defrost mode=1 (заморожена T)
             frozen_temp_ = current_temp_;
-            state_set("thermostat.state", "paused");
+            state_set(ns_key("state"), "paused");
             ESP_LOGI(TAG, "Defrost active — paused (frozen_temp=%.1f°C)", frozen_temp_);
         }
         // Дисплей під час відтайки
         switch (display_defrost_) {
-            case 0:  state_set("thermostat.display_temp", current_temp_); break;
-            case 1:  state_set("thermostat.display_temp", frozen_temp_);  break;
-            default: state_set("thermostat.display_temp", -999.0f);       break;
+            case 0:  state_set(ns_key("display_temp"), current_temp_); break;
+            case 1:  state_set(ns_key("display_temp"), frozen_temp_);  break;
+            default: state_set(ns_key("display_temp"), -999.0f);       break;
         }
         was_defrost_active_ = true;
         publish_outputs();
@@ -284,19 +284,19 @@ void ThermostatModule::on_update(uint32_t dt_ms) {
         // в COOLING через enter_state() з request_compressor(true)
         state_ = State::IDLE;
         state_timer_ms_ = 0;
-        state_set("thermostat.state", "idle");
+        state_set(ns_key("state"), "idle");
         ESP_LOGI(TAG, "Defrost ended — state→idle, timers reset");
     }
 
     // Нормальна робота — display_temp = поточна температура (тільки при зміні)
     if (current_temp_ != last_display_temp_) {
-        state_set("thermostat.display_temp", current_temp_);
+        state_set(ns_key("display_temp"), current_temp_);
         last_display_temp_ = current_temp_;
     }
 
     // 4. Оновлюємо таймери по ФАКТИЧНОМУ стану компресора (BUG-009 fix)
     state_timer_ms_ += dt_ms;
-    bool comp_actual = read_bool("equipment.compressor");
+    bool comp_actual = read_input_bool("equipment.compressor");
     if (comp_actual) {
         comp_on_time_ms_ += dt_ms;
     } else {
@@ -511,8 +511,8 @@ void ThermostatModule::update_cond_fan(uint32_t dt_ms) {
 
 void ThermostatModule::publish_outputs() {
     // track_change=false: таймери не тригерять WS delta broadcast
-    state_set("thermostat.comp_on_time", static_cast<int32_t>(comp_on_time_ms_ / 1000), false);
-    state_set("thermostat.comp_off_time", static_cast<int32_t>(comp_off_time_ms_ / 1000), false);
+    state_set(ns_key("comp_on_time"), static_cast<int32_t>(comp_on_time_ms_ / 1000), false);
+    state_set(ns_key("comp_off_time"), static_cast<int32_t>(comp_off_time_ms_ / 1000), false);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -525,7 +525,7 @@ void ThermostatModule::on_message(const etl::imessage& msg) {
         const auto& sp_msg = static_cast<const modesp::MsgSetpointChanged&>(msg);
         if (sp_msg.target == "thermostat") {
             setpoint_ = sp_msg.value;
-            state_set("thermostat.setpoint", setpoint_);
+            state_set(ns_key("setpoint"), setpoint_);
             ESP_LOGI(TAG, "Setpoint changed: %.1f°C", setpoint_);
         }
         return;

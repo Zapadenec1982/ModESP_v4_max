@@ -85,28 +85,28 @@ bool EquipmentModule::on_init() {
     // не спрацьовувала ERR1/ERR2 до першого реального read().
     // DS18B20 потребує ~750ms на першу конверсію — перші read() фейляться.
     // Якщо датчик не сконфігурований — теж true (не помилка).
-    state_set("equipment.air_temp", 0.0f);
-    state_set("equipment.evap_temp", 0.0f);
-    state_set("equipment.cond_temp", 0.0f);
-    state_set("equipment.sensor1_ok", true);
-    state_set("equipment.sensor2_ok", true);
-    state_set("equipment.compressor", false);
-    state_set("equipment.defrost_relay", false);
-    state_set("equipment.evap_fan", false);
-    state_set("equipment.cond_fan", false);
-    state_set("equipment.door_open", false);
-    state_set("equipment.night_input", false);
+    state_set(ns_key("air_temp"), 0.0f);
+    state_set(ns_key("evap_temp"), 0.0f);
+    state_set(ns_key("cond_temp"), 0.0f);
+    state_set(ns_key("sensor1_ok"), true);
+    state_set(ns_key("sensor2_ok"), true);
+    state_set(ns_key("compressor"), false);
+    state_set(ns_key("defrost_relay"), false);
+    state_set(ns_key("evap_fan"), false);
+    state_set(ns_key("cond_fan"), false);
+    state_set(ns_key("door_open"), false);
+    state_set(ns_key("night_input"), false);
 
     // Публікуємо наявність опціонального обладнання —
     // UI (visible_when, disabled options) та бізнес-модулі перевіряють
-    state_set("equipment.has_defrost_relay", defrost_relay_ != nullptr);
-    state_set("equipment.has_cond_fan", cond_fan_ != nullptr);
-    state_set("equipment.has_door_contact", door_sensor_ != nullptr);
-    state_set("equipment.has_evap_temp", sensor_evap_ != nullptr);
-    state_set("equipment.has_cond_temp", sensor_cond_ != nullptr);
-    state_set("equipment.has_night_input", night_sensor_ != nullptr);
-    state_set("equipment.light", false);
-    state_set("equipment.has_light", light_ != nullptr);
+    state_set(ns_key("has_defrost_relay"), defrost_relay_ != nullptr);
+    state_set(ns_key("has_cond_fan"), cond_fan_ != nullptr);
+    state_set(ns_key("has_door_contact"), door_sensor_ != nullptr);
+    state_set(ns_key("has_evap_temp"), sensor_evap_ != nullptr);
+    state_set(ns_key("has_cond_temp"), sensor_cond_ != nullptr);
+    state_set(ns_key("has_night_input"), night_sensor_ != nullptr);
+    state_set(ns_key("light"), false);
+    state_set(ns_key("has_light"), light_ != nullptr);
 
     // Тип драйверів — для visibility карток налаштувань в UI
     // ISensorDriver::type() повертає "ds18b20", "ntc", "digital_input" тощо
@@ -120,8 +120,8 @@ bool EquipmentModule::on_init() {
     check_type(sensor_air_);
     check_type(sensor_evap_);
     check_type(sensor_cond_);
-    state_set("equipment.has_ntc_driver", uses_ntc);
-    state_set("equipment.has_ds18b20_driver", uses_ds18b20);
+    state_set(ns_key("has_ntc_driver"), uses_ntc);
+    state_set(ns_key("has_ds18b20_driver"), uses_ds18b20);
 
     ESP_LOGI(TAG, "Initialized (air_sensor=%s, compressor=%s, ntc=%s, ds18b20=%s)",
              sensor_air_ ? "OK" : "MISSING",
@@ -178,7 +178,7 @@ void EquipmentModule::on_stop() {
 
 void EquipmentModule::read_sensors() {
     // Коефіцієнт цифрового фільтра (0 = вимкнено, 1-10 = EMA)
-    int coeff = read_int("equipment.filter_coeff", 4);
+    int coeff = read_int(ns_key("filter_coeff"), 4);
     float alpha = (coeff > 0) ? 1.0f / (coeff + 1) : 1.0f;
 
     // Датчик камери (обов'язковий)
@@ -188,12 +188,12 @@ void EquipmentModule::read_sensors() {
             if (!ema_air_init_) { ema_air_ = temp; ema_air_init_ = true; }
             else { ema_air_ += (temp - ema_air_) * alpha; }
             air_temp_ = roundf(ema_air_ * 100.0f) / 100.0f;
-            state_set("equipment.air_temp", air_temp_);
+            state_set(ns_key("air_temp"), air_temp_);
         } else if (!sensor_air_->is_healthy()) {
             air_temp_ = NAN;
-            state_set("equipment.air_temp", NAN);
+            state_set(ns_key("air_temp"), NAN);
         }
-        state_set("equipment.sensor1_ok", sensor_air_->is_healthy());
+        state_set(ns_key("sensor1_ok"), sensor_air_->is_healthy());
     }
 
     // Датчик випарника (опціональний)
@@ -203,12 +203,12 @@ void EquipmentModule::read_sensors() {
             if (!ema_evap_init_) { ema_evap_ = temp; ema_evap_init_ = true; }
             else { ema_evap_ += (temp - ema_evap_) * alpha; }
             evap_temp_ = roundf(ema_evap_ * 100.0f) / 100.0f;
-            state_set("equipment.evap_temp", evap_temp_);
+            state_set(ns_key("evap_temp"), evap_temp_);
         } else if (!sensor_evap_->is_healthy()) {
             evap_temp_ = NAN;
-            state_set("equipment.evap_temp", NAN);
+            state_set(ns_key("evap_temp"), NAN);
         }
-        state_set("equipment.sensor2_ok", sensor_evap_->is_healthy());
+        state_set(ns_key("sensor2_ok"), sensor_evap_->is_healthy());
     }
 
     // Датчик конденсатора (опціональний — DS18B20 або NTC)
@@ -218,10 +218,10 @@ void EquipmentModule::read_sensors() {
             if (!ema_cond_init_) { ema_cond_ = temp; ema_cond_init_ = true; }
             else { ema_cond_ += (temp - ema_cond_) * alpha; }
             cond_temp_ = roundf(ema_cond_ * 100.0f) / 100.0f;
-            state_set("equipment.cond_temp", cond_temp_);
+            state_set(ns_key("cond_temp"), cond_temp_);
         } else if (!sensor_cond_->is_healthy()) {
             cond_temp_ = NAN;
-            state_set("equipment.cond_temp", NAN);
+            state_set(ns_key("cond_temp"), NAN);
         }
     }
 
@@ -229,14 +229,14 @@ void EquipmentModule::read_sensors() {
     if (door_sensor_) {
         float val = 0.0f;
         door_sensor_->read(val);
-        state_set("equipment.door_open", val > 0.5f);
+        state_set(ns_key("door_open"), val > 0.5f);
     }
 
     // Дискретний вхід нічного режиму (опціональний)
     if (night_sensor_) {
         float val = 0.0f;
         night_sensor_->read(val);
-        state_set("equipment.night_input", val > 0.5f);
+        state_set(ns_key("night_input"), val > 0.5f);
     }
 }
 
@@ -246,25 +246,25 @@ void EquipmentModule::read_sensors() {
 
 void EquipmentModule::read_requests() {
     // Thermostat requests
-    req_.therm_compressor = read_bool("thermostat.req.compressor");
-    req_.therm_evap_fan   = read_bool("thermostat.req.evap_fan");
-    req_.therm_cond_fan   = read_bool("thermostat.req.cond_fan");
+    req_.therm_compressor = read_input_bool("thermostat.req.compressor");
+    req_.therm_evap_fan   = read_input_bool("thermostat.req.evap_fan");
+    req_.therm_cond_fan   = read_input_bool("thermostat.req.cond_fan");
 
     // Defrost requests
-    req_.defrost_active    = read_bool("defrost.active");
-    req_.def_compressor    = read_bool("defrost.req.compressor");
-    req_.def_defrost_relay = read_bool("defrost.req.defrost_relay");
-    req_.def_evap_fan      = read_bool("defrost.req.evap_fan");
-    req_.def_cond_fan      = read_bool("defrost.req.cond_fan");
+    req_.defrost_active    = read_input_bool("defrost.active");
+    req_.def_compressor    = read_input_bool("defrost.req.compressor");
+    req_.def_defrost_relay = read_input_bool("defrost.req.defrost_relay");
+    req_.def_evap_fan      = read_input_bool("defrost.req.evap_fan");
+    req_.def_cond_fan      = read_input_bool("defrost.req.cond_fan");
 
     // Protection
-    req_.protection_lockout  = read_bool("protection.lockout");
-    req_.compressor_blocked  = read_bool("protection.compressor_blocked");
-    req_.condenser_blocked   = read_bool("protection.condenser_block");
-    req_.door_comp_blocked   = read_bool("protection.door_comp_blocked");
+    req_.protection_lockout  = read_input_bool("protection.lockout");
+    req_.compressor_blocked  = read_input_bool("protection.compressor_blocked");
+    req_.condenser_blocked   = read_input_bool("protection.condenser_block");
+    req_.door_comp_blocked   = read_input_bool("protection.door_comp_blocked");
 
     // Lighting (незалежний від refrigeration)
-    req_.light_request = read_bool("lighting.req.light");
+    req_.light_request = read_input_bool("lighting.req.light");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -336,7 +336,7 @@ void EquipmentModule::apply_arbitration() {
     // Гарячий газ: компресор потрібен — інтерлок НЕ застосовується.
     // Перевіряємо defrost.type щоб визначити чи реле = тен (type=1).
     if (out_.defrost_relay && out_.compressor) {
-        int defrost_type = read_int("defrost.type", 0);
+        int defrost_type = read_input_int("defrost.type", 0);
         if (defrost_type == 1) {
             // Електричний тен — компресор OFF
             out_.compressor = false;
@@ -380,9 +380,9 @@ void EquipmentModule::publish_state() {
         ESP_LOGI(TAG, "Compressor → %s", comp_now ? "ON" : "OFF");
     }
 
-    state_set("equipment.compressor",    comp_now);
-    state_set("equipment.defrost_relay", defrost_relay_ ? defrost_relay_->get_state() : false);
-    state_set("equipment.evap_fan",      evap_fan_      ? evap_fan_->get_state()      : false);
-    state_set("equipment.cond_fan",      cond_fan_      ? cond_fan_->get_state()      : false);
-    state_set("equipment.light",         light_         ? light_->get_state()         : false);
+    state_set(ns_key("compressor"),    comp_now);
+    state_set(ns_key("defrost_relay"), defrost_relay_ ? defrost_relay_->get_state() : false);
+    state_set(ns_key("evap_fan"),      evap_fan_      ? evap_fan_->get_state()      : false);
+    state_set(ns_key("cond_fan"),      cond_fan_      ? cond_fan_->get_state()      : false);
+    state_set(ns_key("light"),         light_         ? light_->get_state()         : false);
 }

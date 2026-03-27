@@ -21,6 +21,8 @@
 #include "features_config.h"
 #include "etl/message.h"
 #include "etl/optional.h"
+#include "etl/array.h"
+#include "etl/span.h"
 
 namespace modesp {
 
@@ -28,11 +30,32 @@ namespace modesp {
 class ModuleManager;
 class SharedState;
 
+/// Cross-module input binding: maps a role name to a SharedState key
+struct InputBinding {
+    const char* role;         ///< e.g., "air_temp"
+    const char* default_key;  ///< e.g., "equipment.air_temp"
+};
+
 class BaseModule {
 public:
+    /// Original constructor — backward compatible (ns = name)
     BaseModule(const char* name, ModulePriority priority = ModulePriority::NORMAL)
         : name_(name)
+        , ns_(name)
         , priority_(priority)
+    {}
+
+    /// Namespace constructor — for multi-instance modules
+    /// @param name  Module type name (for features lookup, e.g., "thermostat")
+    /// @param ns    Namespace for state keys (e.g., "thermo_z1")
+    /// @param priority  Update priority
+    /// @param inputs  Cross-module input bindings (optional)
+    BaseModule(const char* name, const char* ns, ModulePriority priority,
+               etl::span<const InputBinding> inputs = {})
+        : name_(name)
+        , ns_(ns)
+        , priority_(priority)
+        , inputs_(inputs)
     {}
 
     virtual ~BaseModule() = default;
@@ -105,13 +128,79 @@ protected:
         return modesp::gen::is_feature_active(name(), feature_name);
     }
 
+    // ── Namespace support (Block A) ──
+
+    /// Get the namespace prefix (e.g., "thermostat" or "thermo_z1")
+    const char* ns() const { return ns_; }
+
+    /// Construct namespaced key: ns_ + "." + short_key
+    /// Returns pointer to internal buffer (valid until next ns_key() call)
+    const char* ns_key(const char* short_key) {
+        ns_buf_[0] = '\0';
+        // Manual concatenation (no heap, no snprintf dependency)
+        char* p = ns_buf_;
+        const char* s = ns_;
+        while (*s && p < ns_buf_ + sizeof(ns_buf_) - 2) *p++ = *s++;
+        *p++ = '.';
+        s = short_key;
+        while (*s && p < ns_buf_ + sizeof(ns_buf_) - 1) *p++ = *s++;
+        *p = '\0';
+        return ns_buf_;
+    }
+
+    /// Resolve all keys for a module from short names array into pre-built keys
+    /// Called once in on_init(). After this, keys[KeyEnum] is a fully-qualified StateKey.
+    /// @param short_names  Array of short key names (from generated module_keys.h)
+    /// @param keys         Output array to fill with resolved "ns.short_name" strings
+    /// @param count        Number of keys to resolve
+    template<size_t N>
+    void resolve_keys(const char* const short_names[], etl::array<StateKey, N>& keys, size_t count) {
+        for (size_t i = 0; i < count && i < N; ++i) {
+            keys[i].clear();
+            keys[i].append(ns_);
+            keys[i].append(".");
+            keys[i].append(short_names[i]);
+        }
+    }
+
+    /// Read a cross-module input by role name.
+    /// Looks up role in InputBinding list, falls back to default_key.
+    /// @param role   Input role name (e.g., "air_temp")
+    /// @param def    Default value if key not found in SharedState
+    float read_input_float(const char* role, float def = 0.0f) const {
+        return read_float(resolve_input(role), def);
+    }
+    bool read_input_bool(const char* role, bool def = false) const {
+        return read_bool(resolve_input(role), def);
+    }
+    int32_t read_input_int(const char* role, int32_t def = 0) const {
+        return read_int(resolve_input(role), def);
+    }
+
 private:
     friend class ModuleManager;  // ModuleManager встановлює зв'язки
 
     const char*    name_;
+    const char*    ns_;                          ///< Namespace for state keys (== name_ by default)
     ModulePriority priority_;
+    etl::span<const InputBinding> inputs_ = {};  ///< Cross-module input bindings
     State          state_ = State::CREATED;
     volatile uint32_t last_update_ms_ = 0;
+
+    // Namespace key buffer (for ns_key() — single-threaded, reused)
+    char ns_buf_[64] = {};
+
+    /// Resolve input role to SharedState key via InputBinding lookup
+    const char* resolve_input(const char* role) const {
+        for (const auto& b : inputs_) {
+            // Simple strcmp
+            const char* a = b.role;
+            const char* r = role;
+            while (*a && *a == *r) { a++; r++; }
+            if (*a == *r) return b.default_key;
+        }
+        return role;  // fallback: use role as-is
+    }
 
     // Зворотні посилання (встановлює ModuleManager при реєстрації)
     ModuleManager* manager_ = nullptr;

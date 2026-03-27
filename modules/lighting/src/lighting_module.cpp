@@ -14,11 +14,11 @@ LightingModule::LightingModule()
 
 bool LightingModule::on_init() {
     // PersistService вже відновив lighting.mode з NVS
-    mode_ = read_int("lighting.mode", 0);
+    mode_ = read_int(ns_key("mode"), 0);
 
-    state_set("lighting.mode", mode_);
-    state_set("lighting.state", false);
-    state_set("lighting.req.light", false);
+    state_set(ns_key("mode"), mode_);
+    state_set(ns_key("state"), false);
+    state_set(ns_key("req.light"), false);
 
     ESP_LOGI(TAG, "Initialized (mode=%ld)", mode_);
     return true;
@@ -28,7 +28,7 @@ void LightingModule::on_update(uint32_t dt_ms) {
     (void)dt_ms;
 
     // Sync settings (WebUI/MQTT може змінити)
-    mode_ = read_int("lighting.mode", 0);
+    mode_ = read_int(ns_key("mode"), 0);
 
     // Обчислюємо запит
     bool request = false;
@@ -40,7 +40,7 @@ void LightingModule::on_update(uint32_t dt_ms) {
             request = true;
             break;
         case 2:  // AUTO — день=ON, ніч=OFF (ECO інтеграція)
-            request = !read_bool("thermostat.night_active");
+            request = !read_input_bool("thermostat.night_active");
             break;
         default:
             request = false;
@@ -50,19 +50,19 @@ void LightingModule::on_update(uint32_t dt_ms) {
     // Публікуємо тільки при зміні
     if (request != light_request_) {
         light_request_ = request;
-        state_set("lighting.req.light", request);
+        state_set(ns_key("req.light"), request);
         ESP_LOGI(TAG, "Light → %s (mode=%ld)", request ? "ON" : "OFF", mode_);
     }
 
     // Дзеркалюємо фактичний стан від Equipment
-    bool actual = read_bool("equipment.light");
+    bool actual = read_input_bool("equipment.light");
     if (actual != last_actual_) {
         last_actual_ = actual;
-        state_set("lighting.state", actual);
+        state_set(ns_key("state"), actual);
     }
 }
 
 void LightingModule::on_stop() {
-    state_set("lighting.req.light", false);
+    state_set(ns_key("req.light"), false);
     ESP_LOGI(TAG, "Lighting stopped");
 }

@@ -39,44 +39,44 @@ ProtectionModule::ProtectionModule()
 // ═══════════════════════════════════════════════════════════════
 
 void ProtectionModule::sync_settings() {
-    high_limit_ = read_float("protection.high_limit", high_limit_);
-    low_limit_  = read_float("protection.low_limit", low_limit_);
+    high_limit_ = read_float(ns_key("high_limit"), high_limit_);
+    low_limit_  = read_float(ns_key("low_limit"), low_limit_);
 
     // Хвилини → мілісекунди (окремі затримки для HAL і LAL)
-    high_alarm_delay_ms_ = static_cast<uint32_t>(read_int("protection.high_alarm_delay", 30)) * 60000;
-    low_alarm_delay_ms_  = static_cast<uint32_t>(read_int("protection.low_alarm_delay", 30)) * 60000;
-    door_delay_ms_  = static_cast<uint32_t>(read_int("protection.door_delay", 5)) * 60000;
+    high_alarm_delay_ms_ = static_cast<uint32_t>(read_int(ns_key("high_alarm_delay"), 30)) * 60000;
+    low_alarm_delay_ms_  = static_cast<uint32_t>(read_int(ns_key("low_alarm_delay"), 30)) * 60000;
+    door_delay_ms_  = static_cast<uint32_t>(read_int(ns_key("door_delay"), 5)) * 60000;
 
-    manual_reset_ = read_bool("protection.manual_reset", manual_reset_);
+    manual_reset_ = read_bool(ns_key("manual_reset"), manual_reset_);
 
     // Хвилини → мілісекунди (затримка аварії високої T після відтайки)
     post_defrost_delay_ms_ = static_cast<uint32_t>(
-        read_int("protection.post_defrost_delay", 30)) * 60000;
+        read_int(ns_key("post_defrost_delay"), 30)) * 60000;
 
     // Компресорний захист
     min_compressor_run_ms_ = static_cast<uint32_t>(
-        read_int("protection.min_compressor_run", 120)) * 1000;
-    max_starts_hour_ = read_int("protection.max_starts_hour", 12);
+        read_int(ns_key("min_compressor_run"), 120)) * 1000;
+    max_starts_hour_ = read_int(ns_key("max_starts_hour"), 12);
     max_continuous_run_ms_ = static_cast<uint32_t>(
-        read_int("protection.max_continuous_run", 360)) * 60000;
+        read_int(ns_key("max_continuous_run"), 360)) * 60000;
     pulldown_timeout_ms_ = static_cast<uint32_t>(
-        read_int("protection.pulldown_timeout", 60)) * 60000;
-    pulldown_min_drop_ = read_float("protection.pulldown_min_drop", 2.0f);
-    max_rise_rate_ = read_float("protection.max_rise_rate", 0.5f);
+        read_int(ns_key("pulldown_timeout"), 60)) * 60000;
+    pulldown_min_drop_ = read_float(ns_key("pulldown_min_drop"), 2.0f);
+    max_rise_rate_ = read_float(ns_key("max_rise_rate"), 0.5f);
     rate_duration_ms_ = static_cast<uint32_t>(
-        read_int("protection.rate_duration", 5)) * 60000;
+        read_int(ns_key("rate_duration"), 5)) * 60000;
     // Ескалація continuous run
     forced_off_period_ms_ = static_cast<uint32_t>(
-        read_int("protection.forced_off_period", 20)) * 60000;
-    max_retries_ = read_int("protection.max_retries", 3);
+        read_int(ns_key("forced_off_period"), 20)) * 60000;
+    max_retries_ = read_int(ns_key("max_retries"), 3);
 
     // Condenser protection (like Danfoss A37/A54)
-    condenser_alarm_limit_ = read_float("protection.condenser_alarm_limit", 80.0f);
-    condenser_block_limit_ = read_float("protection.condenser_block_limit", 85.0f);
+    condenser_alarm_limit_ = read_float(ns_key("condenser_alarm_limit"), 80.0f);
+    condenser_block_limit_ = read_float(ns_key("condenser_block_limit"), 85.0f);
 
     // Door → compressor delay (like Danfoss C04, seconds)
     door_comp_delay_ms_ = static_cast<uint32_t>(
-        read_int("protection.door_comp_delay", 900)) * 1000;
+        read_int(ns_key("door_comp_delay"), 900)) * 1000;
 
     // compressor_hours_ читається ТІЛЬКИ в on_init() —
     // тут не перечитуємо, бо модуль акумулює значення між записами в state
@@ -90,34 +90,34 @@ bool ProtectionModule::on_init() {
     // PersistService вже відновив збережені значення з NVS → SharedState (Phase 1)
     sync_settings();
     // compressor_hours — акумулятивний наробіток, читаємо тільки раз при init
-    compressor_hours_ = read_float("protection.compressor_hours", 0.0f);
+    compressor_hours_ = read_float(ns_key("compressor_hours"), 0.0f);
 
     // Початковий стан — існуючі
-    state_set("protection.lockout", false);
-    state_set("protection.alarm_active", false);
-    state_set("protection.alarm_code", "none");
-    state_set("protection.high_temp_alarm", false);
-    state_set("protection.low_temp_alarm", false);
-    state_set("protection.sensor1_alarm", false);
-    state_set("protection.sensor2_alarm", false);
-    state_set("protection.door_alarm", false);
-    state_set("protection.reset_alarms", false);
+    state_set(ns_key("lockout"), false);
+    state_set(ns_key("alarm_active"), false);
+    state_set(ns_key("alarm_code"), "none");
+    state_set(ns_key("high_temp_alarm"), false);
+    state_set(ns_key("low_temp_alarm"), false);
+    state_set(ns_key("sensor1_alarm"), false);
+    state_set(ns_key("sensor2_alarm"), false);
+    state_set(ns_key("door_alarm"), false);
+    state_set(ns_key("reset_alarms"), false);
 
     // Ескалація continuous run
-    state_set("protection.compressor_blocked", false);
-    state_set("protection.continuous_run_count", static_cast<int32_t>(0));
+    state_set(ns_key("compressor_blocked"), false);
+    state_set(ns_key("continuous_run_count"), static_cast<int32_t>(0));
 
     // Початковий стан — компресорний захист
-    state_set("protection.short_cycle_alarm", false);
-    state_set("protection.rapid_cycle_alarm", false);
-    state_set("protection.continuous_run_alarm", false);
-    state_set("protection.pulldown_alarm", false);
-    state_set("protection.rate_alarm", false);
-    state_set("protection.compressor_starts_1h", (int32_t)0);
-    state_set("protection.compressor_duty", 0.0f);
-    state_set("protection.compressor_run_time", (int32_t)0);
-    state_set("protection.last_cycle_run", (int32_t)0);
-    state_set("protection.last_cycle_off", (int32_t)0);
+    state_set(ns_key("short_cycle_alarm"), false);
+    state_set(ns_key("rapid_cycle_alarm"), false);
+    state_set(ns_key("continuous_run_alarm"), false);
+    state_set(ns_key("pulldown_alarm"), false);
+    state_set(ns_key("rate_alarm"), false);
+    state_set(ns_key("compressor_starts_1h"), (int32_t)0);
+    state_set(ns_key("compressor_duty"), 0.0f);
+    state_set(ns_key("compressor_run_time"), (int32_t)0);
+    state_set(ns_key("last_cycle_run"), (int32_t)0);
+    state_set(ns_key("last_cycle_off"), (int32_t)0);
     // compressor_hours вже в SharedState від PersistService
 
     ESP_LOGI(TAG, "Initialized (HAL=%.1f°C/%lumin, LAL=%.1f°C/%lumin)",
@@ -139,11 +139,11 @@ void ProtectionModule::on_update(uint32_t dt_ms) {
     sync_settings();
 
     // 2. Читаємо inputs з SharedState
-    float air_temp   = read_float("equipment.air_temp");
-    bool  sensor1_ok = read_bool("equipment.sensor1_ok");
-    bool  sensor2_ok = read_bool("equipment.sensor2_ok");
-    bool  door_open  = read_bool("equipment.door_open");
-    bool  defrost    = read_bool("defrost.active");
+    float air_temp   = read_input_float("equipment.air_temp");
+    bool  sensor1_ok = read_input_bool("equipment.sensor1_ok");
+    bool  sensor2_ok = read_input_bool("equipment.sensor2_ok");
+    bool  door_open  = read_input_bool("equipment.door_open");
+    bool  defrost    = read_input_bool("defrost.active");
 
     // Визначаємо чи defrost у фазі нагріву (BUG-007 fix)
     // HAL alarm блокується тільки в heating-фазах: stabilize, valve_open, active, equalize
@@ -193,7 +193,7 @@ void ProtectionModule::on_update(uint32_t dt_ms) {
     update_low_temp(air_temp, sensor1_ok, dt_ms);
     update_sensor_alarm(sensor1_, sensor1_ok, "SENSOR1 (ERR1)");
     // sensor2 (evap_temp) — тільки якщо датчик підключений в bindings
-    if (read_bool("equipment.has_evap_temp")) {
+    if (read_input_bool("equipment.has_evap_temp")) {
         update_sensor_alarm(sensor2_, sensor2_ok, "SENSOR2 (ERR2)");
     } else if (sensor2_.active) {
         // Якщо датчик відключили — скинути хибний алярм
@@ -217,18 +217,18 @@ void ProtectionModule::on_update(uint32_t dt_ms) {
                 ESP_LOGI(TAG, "Door compressor block cleared");
             }
         }
-        state_set("protection.door_comp_blocked", door_comp_blocked_);
+        state_set(ns_key("door_comp_blocked"), door_comp_blocked_);
     }
 
     // 6. Condenser temperature protection
-    if (read_bool("equipment.has_cond_temp")) {
-        float cond_temp = read_float("equipment.cond_temp");
+    if (read_input_bool("equipment.has_cond_temp")) {
+        float cond_temp = read_input_float("equipment.cond_temp");
         update_condenser_alarm(cond_temp, true, dt_ms);
     }
 
     // 7. Компресорний захист
     if (has_feature("compressor_protection")) {
-        bool compressor_on = read_bool("equipment.compressor");
+        bool compressor_on = read_input_bool("equipment.compressor");
         update_compressor_tracker(compressor_on, air_temp, defrost, dt_ms);
 
         // Rate-of-change монітор
@@ -410,13 +410,8 @@ void ProtectionModule::update_compressor_tracker(bool compressor_on, float temp,
         comp_.temp_at_start = temp;
 
         // Записуємо evap baseline для pulldown (matched comparison)
-        auto evap_start = state_get("equipment.evap_temp");
-        if (evap_start.has_value()) {
-            const auto* fp = etl::get_if<float>(&evap_start.value());
-            comp_.evap_at_start = fp ? *fp : temp;
-        } else {
-            comp_.evap_at_start = temp;  // fallback to air
-        }
+        float evap_start_val = read_input_float("equipment.evap_temp", NAN);
+        comp_.evap_at_start = std::isnan(evap_start_val) ? temp : evap_start_val;
 
         // Записуємо timestamp в ring buffer
         comp_.start_timestamps[comp_.start_head] = comp_.window_ms;
@@ -513,11 +508,11 @@ void ProtectionModule::update_compressor_tracker(bool compressor_on, float temp,
                          continuous_run_count_, max_retries_);
 
                 // Перевірка обмерзання: якщо T_evap < demand_temp → тригер відтайки
-                if (read_bool("equipment.has_evap_temp")) {
-                    int defrost_type = read_int("defrost.type", 0);
+                if (read_input_bool("equipment.has_evap_temp")) {
+                    int defrost_type = read_input_int("defrost.type", 0);
                     if (defrost_type != 0) {
-                        float evap_temp = read_float("equipment.evap_temp");
-                        float demand_temp = read_float("defrost.demand_temp", -15.0f);
+                        float evap_temp = read_input_float("equipment.evap_temp");
+                        float demand_temp = read_input_float("defrost.demand_temp", -15.0f);
                         if (evap_temp < demand_temp) {
                             state_set("defrost.manual_start", true);
                             ESP_LOGI(TAG, "Icing suspected (evap=%.1f < demand=%.1f) — defrost triggered",
@@ -531,7 +526,7 @@ void ProtectionModule::update_compressor_tracker(bool compressor_on, float temp,
             comp_.current_run_ms = 0;
             continuous_run_.active = false;  // Дозволяємо повторний тригер
 
-            state_set("protection.continuous_run_count",
+            state_set(ns_key("continuous_run_count"),
                        static_cast<int32_t>(continuous_run_count_));
         }
     } else if (permanent_lockout_) {
@@ -556,7 +551,7 @@ void ProtectionModule::update_compressor_tracker(bool compressor_on, float temp,
         if (comp_.last_run_ms > 0 && comp_.last_run_ms < max_continuous_run_ms_) {
             if (continuous_run_count_ > 0) {
                 continuous_run_count_ = 0;
-                state_set("protection.continuous_run_count", static_cast<int32_t>(0));
+                state_set(ns_key("continuous_run_count"), static_cast<int32_t>(0));
                 ESP_LOGI(TAG, "Continuous run counter reset (normal cycle)");
             }
         }
@@ -570,13 +565,10 @@ void ProtectionModule::update_compressor_tracker(bool compressor_on, float temp,
         // Matched baseline: evap vs evap, або air vs air
         float start_temp = comp_.temp_at_start;   // air_temp при старті
         float current_temp = temp;                 // air_temp зараз
-        auto evap_val = state_get("equipment.evap_temp");
-        if (evap_val.has_value()) {
-            const auto* fp = etl::get_if<float>(&evap_val.value());
-            if (fp) {
-                start_temp = comp_.evap_at_start;  // evap при старті
-                current_temp = *fp;                 // evap зараз
-            }
+        float evap_now = read_input_float("equipment.evap_temp", NAN);
+        if (!std::isnan(evap_now)) {
+            start_temp = comp_.evap_at_start;  // evap при старті
+            current_temp = evap_now;            // evap зараз
         }
 
         float temp_drop = start_temp - current_temp;
@@ -682,23 +674,23 @@ void ProtectionModule::publish_compressor_diagnostics() {
     int32_t last_off = static_cast<int32_t>(comp_.last_off_ms / 1000);
 
     // Мотогодини: інкремент за 5 секунд (якщо компресор ON)
-    if (read_bool("equipment.compressor")) {
+    if (read_input_bool("equipment.compressor")) {
         compressor_hours_ += 5.0f / 3600.0f;
     }
 
     // track_change=false — діагностика не тригерить WS broadcasts
-    state_set("protection.compressor_starts_1h", starts, false);
-    state_set("protection.compressor_duty", duty, false);
-    state_set("protection.compressor_run_time", run_sec, false);
-    state_set("protection.last_cycle_run", last_run, false);
-    state_set("protection.last_cycle_off", last_off, false);
+    state_set(ns_key("compressor_starts_1h"), starts, false);
+    state_set(ns_key("compressor_duty"), duty, false);
+    state_set(ns_key("compressor_run_time"), run_sec, false);
+    state_set(ns_key("last_cycle_run"), last_run, false);
+    state_set(ns_key("last_cycle_off"), last_off, false);
 
     // compressor_hours — persist раз на 1 год (720 × 5с = 3600с)
     // state_set() тригерить persist callback → NVS write, тому викликаємо РІДКО
     hours_persist_counter_++;
     if (hours_persist_counter_ >= 720) {
         hours_persist_counter_ = 0;
-        state_set("protection.compressor_hours", compressor_hours_);
+        state_set(ns_key("compressor_hours"), compressor_hours_);
     }
 }
 
@@ -707,7 +699,7 @@ void ProtectionModule::publish_compressor_diagnostics() {
 // ═══════════════════════════════════════════════════════════════
 
 void ProtectionModule::check_reset_command() {
-    if (read_bool("protection.reset_alarms")) {
+    if (read_bool(ns_key("reset_alarms"))) {
         // Скидаємо всі активні аварії
         bool any = high_temp_.active || low_temp_.active || sensor1_.active ||
                    sensor2_.active || door_.active ||
@@ -756,16 +748,16 @@ void ProtectionModule::check_reset_command() {
             forced_off_active_ = false;
             forced_off_timer_ms_ = 0;
             permanent_lockout_ = false;
-            state_set("protection.continuous_run_count", static_cast<int32_t>(0));
+            state_set(ns_key("continuous_run_count"), static_cast<int32_t>(0));
 
             // Негайно публікуємо зняття блокіровки
-            state_set("protection.compressor_blocked", false);
-            state_set("protection.lockout", false);
+            state_set(ns_key("compressor_blocked"), false);
+            state_set(ns_key("lockout"), false);
 
             ESP_LOGI(TAG, "All alarms reset — tracker state cleared");
         }
         // Скидаємо trigger
-        state_set("protection.reset_alarms", false);
+        state_set(ns_key("reset_alarms"), false);
     }
 }
 
@@ -775,24 +767,24 @@ void ProtectionModule::check_reset_command() {
 
 void ProtectionModule::publish_alarms() {
     // Ескалація: compressor block (рівень 1) + lockout (рівень 2)
-    state_set("protection.compressor_blocked", forced_off_active_);
-    state_set("protection.lockout", permanent_lockout_);
+    state_set(ns_key("compressor_blocked"), forced_off_active_);
+    state_set(ns_key("lockout"), permanent_lockout_);
 
     // Окремі алерти — існуючі
-    state_set("protection.high_temp_alarm", high_temp_.active);
-    state_set("protection.low_temp_alarm", low_temp_.active);
-    state_set("protection.sensor1_alarm", sensor1_.active);
-    state_set("protection.sensor2_alarm", sensor2_.active);
-    state_set("protection.door_alarm", door_.active);
+    state_set(ns_key("high_temp_alarm"), high_temp_.active);
+    state_set(ns_key("low_temp_alarm"), low_temp_.active);
+    state_set(ns_key("sensor1_alarm"), sensor1_.active);
+    state_set(ns_key("sensor2_alarm"), sensor2_.active);
+    state_set(ns_key("door_alarm"), door_.active);
 
     // Окремі алерти — нові
-    state_set("protection.short_cycle_alarm", short_cycle_.active);
-    state_set("protection.rapid_cycle_alarm", rapid_cycle_.active);
-    state_set("protection.continuous_run_alarm", continuous_run_.active);
-    state_set("protection.pulldown_alarm", pulldown_.active);
-    state_set("protection.rate_alarm", rate_rise_.active);
-    state_set("protection.condenser_alarm", condenser_.active);
-    state_set("protection.condenser_block", condenser_block_.active);
+    state_set(ns_key("short_cycle_alarm"), short_cycle_.active);
+    state_set(ns_key("rapid_cycle_alarm"), rapid_cycle_.active);
+    state_set(ns_key("continuous_run_alarm"), continuous_run_.active);
+    state_set(ns_key("pulldown_alarm"), pulldown_.active);
+    state_set(ns_key("rate_alarm"), rate_rise_.active);
+    state_set(ns_key("condenser_alarm"), condenser_.active);
+    state_set(ns_key("condenser_block"), condenser_block_.active);
 
     // Зведений статус (включає ескалацію)
     bool any_alarm = high_temp_.active || low_temp_.active ||
@@ -801,7 +793,7 @@ void ProtectionModule::publish_alarms() {
                      continuous_run_.active || pulldown_.active || rate_rise_.active ||
                      condenser_.active || condenser_block_.active ||
                      permanent_lockout_ || forced_off_active_;
-    state_set("protection.alarm_active", any_alarm);
+    state_set(ns_key("alarm_active"), any_alarm);
 
     // Код найвищої за пріоритетом аварії
     // lockout > comp_blocked > err1 > rate_rise > high_temp > pulldown >
@@ -837,7 +829,7 @@ void ProtectionModule::publish_alarms() {
     } else {
         alarm_code_ = "none";
     }
-    state_set("protection.alarm_code", alarm_code_);
+    state_set(ns_key("alarm_code"), alarm_code_);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -884,9 +876,9 @@ void ProtectionModule::update_condenser_alarm(float cond_temp, bool has_cond,
 // ═══════════════════════════════════════════════════════════════
 
 void ProtectionModule::on_stop() {
-    state_set("protection.lockout", false);
-    state_set("protection.compressor_blocked", false);
-    state_set("protection.alarm_active", false);
-    state_set("protection.alarm_code", "none");
+    state_set(ns_key("lockout"), false);
+    state_set(ns_key("compressor_blocked"), false);
+    state_set(ns_key("alarm_active"), false);
+    state_set(ns_key("alarm_code"), "none");
     ESP_LOGI(TAG, "Protection stopped");
 }

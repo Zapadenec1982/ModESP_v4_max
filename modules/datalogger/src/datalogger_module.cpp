@@ -125,25 +125,25 @@ bool DataLoggerModule::on_init() {
     log_event(EVENT_POWER_ON);
 
     // Ініціалізувати SharedState (після POWER_ON щоб events_count включав його)
-    state_set("datalogger.records_count", static_cast<int32_t>(temp_count_));
-    state_set("datalogger.events_count",
+    state_set(ns_key("records_count"), static_cast<int32_t>(temp_count_));
+    state_set(ns_key("events_count"),
               static_cast<int32_t>(event_count_ + event_buf_.size()));
-    state_set("datalogger.flash_used", static_cast<int32_t>(flash_used_kb_));
+    state_set(ns_key("flash_used"), static_cast<int32_t>(flash_used_kb_));
 
     // Прочитати початковий стан для edge-detect
-    prev_compressor_     = read_bool("equipment.compressor", false);
-    prev_defrost_active_ = read_bool("defrost.active", false);
-    prev_door_open_      = read_bool("equipment.door_open", false);
-    prev_alarm_high_     = read_bool("protection.high_temp_alarm", false);
-    prev_alarm_low_      = read_bool("protection.low_temp_alarm", false);
-    prev_sensor1_alarm_  = read_bool("protection.sensor1_alarm", false);
-    prev_sensor2_alarm_  = read_bool("protection.sensor2_alarm", false);
-    prev_cont_run_alarm_ = read_bool("protection.continuous_run_alarm", false);
-    prev_pulldown_alarm_ = read_bool("protection.pulldown_alarm", false);
-    prev_short_cyc_alarm_= read_bool("protection.short_cycle_alarm", false);
-    prev_rapid_cyc_alarm_= read_bool("protection.rapid_cycle_alarm", false);
-    prev_rate_alarm_     = read_bool("protection.rate_alarm", false);
-    prev_door_alarm_     = read_bool("protection.door_alarm", false);
+    prev_compressor_     = read_input_bool("equipment.compressor", false);
+    prev_defrost_active_ = read_input_bool("defrost.active", false);
+    prev_door_open_      = read_input_bool("equipment.door_open", false);
+    prev_alarm_high_     = read_input_bool("protection.high_temp_alarm", false);
+    prev_alarm_low_      = read_input_bool("protection.low_temp_alarm", false);
+    prev_sensor1_alarm_  = read_input_bool("protection.sensor1_alarm", false);
+    prev_sensor2_alarm_  = read_input_bool("protection.sensor2_alarm", false);
+    prev_cont_run_alarm_ = read_input_bool("protection.continuous_run_alarm", false);
+    prev_pulldown_alarm_ = read_input_bool("protection.pulldown_alarm", false);
+    prev_short_cyc_alarm_= read_input_bool("protection.short_cycle_alarm", false);
+    prev_rapid_cyc_alarm_= read_input_bool("protection.rapid_cycle_alarm", false);
+    prev_rate_alarm_     = read_input_bool("protection.rate_alarm", false);
+    prev_door_alarm_     = read_input_bool("protection.door_alarm", false);
 
     // Логувати активні канали
     int active = 0;
@@ -159,9 +159,9 @@ bool DataLoggerModule::on_init() {
 // ── Sync settings ──
 
 void DataLoggerModule::sync_settings() {
-    int32_t interval = read_int("datalogger.sample_interval", 60);
+    int32_t interval = read_int(ns_key("sample_interval"), 60);
     sample_interval_ms_ = interval * 1000;
-    retention_hours_ = read_int("datalogger.retention_hours", 48);
+    retention_hours_ = read_int(ns_key("retention_hours"), 48);
 
     // Оновити enabled стан кожного каналу
     for (int i = 0; i < MAX_CHANNELS; i++) {
@@ -185,7 +185,7 @@ void DataLoggerModule::sync_settings() {
 // ── Main loop ──
 
 void DataLoggerModule::on_update(uint32_t dt_ms) {
-    if (!read_bool("datalogger.enabled", true)) return;
+    if (!read_bool(ns_key("enabled"), true)) return;
 
     sync_settings();
 
@@ -212,7 +212,7 @@ void DataLoggerModule::on_update(uint32_t dt_ms) {
 
         if (!temp_buf_.full()) {
             temp_buf_.push_back(rec);
-            state_set("datalogger.records_count",
+            state_set(ns_key("records_count"),
                       static_cast<int32_t>(temp_count_ + temp_buf_.size()));
         }
     }
@@ -221,7 +221,7 @@ void DataLoggerModule::on_update(uint32_t dt_ms) {
     size_t events_before = event_buf_.size();
     poll_events();
     if (event_buf_.size() != events_before) {
-        state_set("datalogger.events_count",
+        state_set(ns_key("events_count"),
                   static_cast<int32_t>(event_count_ + event_buf_.size()));
     }
 
@@ -236,19 +236,19 @@ void DataLoggerModule::on_update(uint32_t dt_ms) {
 // ── Edge-detect подій ──
 
 void DataLoggerModule::poll_events() {
-    bool comp = read_bool("equipment.compressor", false);
+    bool comp = read_input_bool("equipment.compressor", false);
     if (comp != prev_compressor_) {
         log_event(comp ? EVENT_COMPRESSOR_ON : EVENT_COMPRESSOR_OFF);
         prev_compressor_ = comp;
     }
 
-    bool defrost = read_bool("defrost.active", false);
+    bool defrost = read_input_bool("defrost.active", false);
     if (defrost != prev_defrost_active_) {
         log_event(defrost ? EVENT_DEFROST_START : EVENT_DEFROST_END);
         prev_defrost_active_ = defrost;
     }
 
-    bool door = read_bool("equipment.door_open", false);
+    bool door = read_input_bool("equipment.door_open", false);
     if (door != prev_door_open_) {
         log_event(door ? EVENT_DOOR_OPEN : EVENT_DOOR_CLOSE);
         prev_door_open_ = door;
@@ -257,54 +257,54 @@ void DataLoggerModule::poll_events() {
     // === Аварії: rising edge → event, falling edge → ALARM_CLEAR ===
     // ВАЖЛИВО: зберігаємо prev_ ПІСЛЯ clear check
 
-    bool alarm_high = read_bool("protection.high_temp_alarm", false);
+    bool alarm_high = read_input_bool("protection.high_temp_alarm", false);
     if (alarm_high && !prev_alarm_high_) log_event(EVENT_ALARM_HIGH);
     if (!alarm_high && prev_alarm_high_) log_event(EVENT_ALARM_CLEAR);
     prev_alarm_high_ = alarm_high;
 
-    bool alarm_low = read_bool("protection.low_temp_alarm", false);
+    bool alarm_low = read_input_bool("protection.low_temp_alarm", false);
     if (alarm_low && !prev_alarm_low_) log_event(EVENT_ALARM_LOW);
     if (!alarm_low && prev_alarm_low_) log_event(EVENT_ALARM_CLEAR);
     prev_alarm_low_ = alarm_low;
 
     // Sensor alarms
-    bool s1 = read_bool("protection.sensor1_alarm", false);
+    bool s1 = read_input_bool("protection.sensor1_alarm", false);
     if (s1 && !prev_sensor1_alarm_) log_event(EVENT_ALARM_SENSOR1);
     if (!s1 && prev_sensor1_alarm_) log_event(EVENT_ALARM_CLEAR);
     prev_sensor1_alarm_ = s1;
 
-    bool s2 = read_bool("protection.sensor2_alarm", false);
+    bool s2 = read_input_bool("protection.sensor2_alarm", false);
     if (s2 && !prev_sensor2_alarm_) log_event(EVENT_ALARM_SENSOR2);
     if (!s2 && prev_sensor2_alarm_) log_event(EVENT_ALARM_CLEAR);
     prev_sensor2_alarm_ = s2;
 
     // Compressor protection alarms
-    bool cont = read_bool("protection.continuous_run_alarm", false);
+    bool cont = read_input_bool("protection.continuous_run_alarm", false);
     if (cont && !prev_cont_run_alarm_) log_event(EVENT_ALARM_CONT_RUN);
     if (!cont && prev_cont_run_alarm_) log_event(EVENT_ALARM_CLEAR);
     prev_cont_run_alarm_ = cont;
 
-    bool pull = read_bool("protection.pulldown_alarm", false);
+    bool pull = read_input_bool("protection.pulldown_alarm", false);
     if (pull && !prev_pulldown_alarm_) log_event(EVENT_ALARM_PULLDOWN);
     if (!pull && prev_pulldown_alarm_) log_event(EVENT_ALARM_CLEAR);
     prev_pulldown_alarm_ = pull;
 
-    bool sc = read_bool("protection.short_cycle_alarm", false);
+    bool sc = read_input_bool("protection.short_cycle_alarm", false);
     if (sc && !prev_short_cyc_alarm_) log_event(EVENT_ALARM_SHORT_CYC);
     if (!sc && prev_short_cyc_alarm_) log_event(EVENT_ALARM_CLEAR);
     prev_short_cyc_alarm_ = sc;
 
-    bool rc = read_bool("protection.rapid_cycle_alarm", false);
+    bool rc = read_input_bool("protection.rapid_cycle_alarm", false);
     if (rc && !prev_rapid_cyc_alarm_) log_event(EVENT_ALARM_RAPID_CYC);
     if (!rc && prev_rapid_cyc_alarm_) log_event(EVENT_ALARM_CLEAR);
     prev_rapid_cyc_alarm_ = rc;
 
-    bool rate = read_bool("protection.rate_alarm", false);
+    bool rate = read_input_bool("protection.rate_alarm", false);
     if (rate && !prev_rate_alarm_) log_event(EVENT_ALARM_RATE_RISE);
     if (!rate && prev_rate_alarm_) log_event(EVENT_ALARM_CLEAR);
     prev_rate_alarm_ = rate;
 
-    bool da = read_bool("protection.door_alarm", false);
+    bool da = read_input_bool("protection.door_alarm", false);
     if (da && !prev_door_alarm_) log_event(EVENT_ALARM_DOOR);
     if (!da && prev_door_alarm_) log_event(EVENT_ALARM_CLEAR);
     prev_door_alarm_ = da;
@@ -341,7 +341,7 @@ bool DataLoggerModule::flush_to_flash() {
             fclose(f);
             temp_count_ += written;
             temp_buf_.clear();
-            state_set("datalogger.records_count", static_cast<int32_t>(temp_count_));
+            state_set(ns_key("records_count"), static_cast<int32_t>(temp_count_));
         } else {
             ESP_LOGE(TAG, "Не вдалося відкрити %s", TEMP_FILE);
         }
@@ -359,7 +359,7 @@ bool DataLoggerModule::flush_to_flash() {
             fclose(f);
             event_count_ += written;
             event_buf_.clear();
-            state_set("datalogger.events_count", static_cast<int32_t>(event_count_));
+            state_set(ns_key("events_count"), static_cast<int32_t>(event_count_));
         } else {
             ESP_LOGE(TAG, "Не вдалося відкрити %s", EVENT_FILE);
         }
@@ -368,7 +368,7 @@ bool DataLoggerModule::flush_to_flash() {
     }
 
     update_flash_used();
-    state_set("datalogger.flash_used", static_cast<int32_t>(flash_used_kb_));
+    state_set(ns_key("flash_used"), static_cast<int32_t>(flash_used_kb_));
 
     ESP_LOGD(TAG, "Flush: %lu temp, %lu events",
              (unsigned long)temp_count_, (unsigned long)event_count_);
