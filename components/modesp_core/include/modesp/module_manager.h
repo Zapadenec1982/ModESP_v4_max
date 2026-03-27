@@ -26,7 +26,7 @@
 namespace modesp {
 
 #ifndef MODESP_MAX_MODULES
-#define MODESP_MAX_MODULES 16
+#define MODESP_MAX_MODULES 24
 #endif
 
 #ifndef MODESP_MAX_BUS_ROUTERS

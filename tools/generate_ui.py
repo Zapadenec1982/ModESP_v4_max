@@ -1006,6 +1006,45 @@ class UIJsonGenerator:
             }
             subtitle = "WiFi та MQTT"
 
+        modbus_card = {
+            "title": "Modbus RTU",
+            "icon": "cpu",
+            "group": "settings",
+            "collapsible": True,
+            "defaultOpen": False,
+            "wide": True,
+            "widgets": [
+                {"key": "modbus.slave_addr", "widget": "number_input",
+                 "editable": True, "description": "Slave адреса",
+                 "min": 1, "max": 247, "step": 1,
+                 "form_only": True},
+                {"key": "modbus.baud_rate", "widget": "select",
+                 "editable": True, "description": "Швидкість (baud)",
+                 "options": [
+                     {"value": 9600, "label": "9600"},
+                     {"value": 19200, "label": "19200"},
+                     {"value": 38400, "label": "38400"},
+                     {"value": 57600, "label": "57600"},
+                     {"value": 115200, "label": "115200"},
+                 ],
+                 "form_only": True},
+                {"key": "modbus.parity", "widget": "select",
+                 "editable": True, "description": "Парність",
+                 "options": [
+                     {"value": "none", "label": "None (8N2)"},
+                     {"value": "even", "label": "Even (8E1)"},
+                     {"value": "odd", "label": "Odd (8O1)"},
+                 ],
+                 "form_only": True},
+                {"key": "modbus.enabled", "widget": "toggle",
+                 "editable": True, "description": "Увімкнути Modbus",
+                 "form_only": True},
+                {"key": "_action.modbus_save", "widget": "modbus_save",
+                 "label": "Зберегти",
+                 "api_endpoint": "/api/modbus"},
+            ],
+        }
+
         return {
             "id": "network",
             "title": "Мережа",
@@ -1023,6 +1062,7 @@ class UIJsonGenerator:
                 wifi_card,
                 ap_card,
                 cloud_card,
+                modbus_card,
             ],
         }
 
@@ -1259,7 +1299,7 @@ class StateMetaGenerator:
     def generate(self, manifests):
         # Підрахунок ВСІХ state keys з маніфестів для auto-capacity
         total_manifest_keys = sum(len(m.get("state", {})) for m in manifests)
-        capacity = total_manifest_keys + 32  # +32 для runtime ключів (_ota.*, wifi.*, mqtt.*, system.*)
+        capacity = total_manifest_keys + 48  # +48 для runtime ключів (_ota.*, wifi.*, mqtt.*, modbus.*, system.*)
 
         lines = [
             "#pragma once",

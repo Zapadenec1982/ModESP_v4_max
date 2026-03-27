@@ -156,6 +156,7 @@ export default {
   'btn.restart': 'Перезавантажити',
   'btn.cancel': 'Пізніше',
   'alert.saved_mqtt': 'Збережено! MQTT перепідключується...',
+  'alert.saved_modbus': 'Збережено! Modbus перезапускається...',
   'alert.error': 'Помилка збереження',
   'alert.conn_error': 'Помилка з\'єднання',
   'alert.invalid_value': 'Некоректне значення',

@@ -67,6 +67,7 @@ private:
     // Protected by mbc_slave_lock()/unlock()
     uint16_t shadow_input_[128] = {};     // Input registers (read-only)
     uint16_t shadow_holding_[128] = {};   // Holding registers (read-write)
+    uint16_t prev_holding_[128] = {};    // Previous holding values (for write detection)
     uint8_t shadow_coils_[16] = {};       // Coils (read-only, alarm bits)
     uint8_t shadow_discrete_[8] = {};     // Discrete inputs (relay states)
 

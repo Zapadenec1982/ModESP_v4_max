@@ -22,7 +22,6 @@
 #include "esp_app_desc.h"
 #include "esp_timer.h"
 
-#define JSMN_STATIC
 #include "jsmn.h"
 
 #include <cstring>

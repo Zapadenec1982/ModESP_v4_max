@@ -142,6 +142,7 @@ export default {
   'alert.saved': 'Saved!',
   'alert.saved_restart': 'Saved! Restart to apply.',
   'alert.saved_mqtt': 'Saved! MQTT reconnecting...',
+  'alert.saved_modbus': 'Saved! Modbus restarting...',
   'alert.error': 'Save error',
   'alert.conn_error': 'Connection error',
   'alert.invalid_value': 'Invalid value',

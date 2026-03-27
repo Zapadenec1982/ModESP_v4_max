@@ -24,6 +24,7 @@
   import ActionsGrid from './widgets/ActionsGrid.svelte';
   import CloudSave from './widgets/CloudSave.svelte';
   import CertUpload from './widgets/CertUpload.svelte';
+  import ModbusSave from './widgets/ModbusSave.svelte';
 
   export let widget;
   export let value;
@@ -53,7 +54,8 @@
     auth_save: AuthSave,
     actions_grid: ActionsGrid,
     cloud_save: CloudSave,
-    cert_upload: CertUpload
+    cert_upload: CertUpload,
+    modbus_save: ModbusSave
   };
 
   $: component = widgetMap[widget.widget] || ValueWidget;

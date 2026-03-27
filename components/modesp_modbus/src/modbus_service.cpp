@@ -92,59 +92,55 @@ void ModbusService::on_stop() {
 // ═══════════════════════════════════════════════════════════════
 
 bool ModbusService::start_modbus() {
-    // Create Modbus slave controller
-    esp_err_t err = mbc_slave_init(MB_PORT_SERIAL_SLAVE, &mb_handle_);
-    if (err != ESP_OK || !mb_handle_) {
-        ESP_LOGE(TAG, "mbc_slave_init failed: %s", esp_err_to_name(err));
-        return false;
-    }
-
-    // UART communication config
     // KC868-A6: RS485 via MAX13487EESA (auto-direction)
-    // TX=GPIO27, RX=GPIO14, no RTS needed
-    mb_communication_info_t comm_info = {};
-    comm_info.mode = MB_MODE_RTU;
-    comm_info.slave_addr = static_cast<uint8_t>(slave_address_);
-    comm_info.port = UART_NUM_1;
-    comm_info.baudrate = static_cast<uint32_t>(baudrate_);
-    comm_info.parity = (parity_ == 0) ? UART_PARITY_DISABLE :
-                       (parity_ == 1) ? UART_PARITY_EVEN : UART_PARITY_ODD;
+    // TX=GPIO27, RX=GPIO14, no RTS/DE needed (auto-direction chip)
+    mb_communication_info_t comm_config = {};
+    comm_config.ser_opts.port = UART_NUM_1;
+    comm_config.ser_opts.mode = MB_RTU;
+    comm_config.ser_opts.uid = static_cast<uint8_t>(slave_address_);
+    comm_config.ser_opts.baudrate = static_cast<uint32_t>(baudrate_);
+    comm_config.ser_opts.parity = (parity_ == 0) ? UART_PARITY_DISABLE :
+                                  (parity_ == 1) ? UART_PARITY_EVEN : UART_PARITY_ODD;
+    comm_config.ser_opts.data_bits = UART_DATA_8_BITS;
+    comm_config.ser_opts.stop_bits = (parity_ == 0) ? UART_STOP_BITS_2 : UART_STOP_BITS_1;
 
-    err = mbc_slave_setup(&comm_info);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "mbc_slave_setup failed: %s", esp_err_to_name(err));
-        mbc_slave_destroy();
-        mb_handle_ = nullptr;
+    // Create Modbus slave controller (v2 handle-based API)
+    esp_err_t err = mbc_slave_create_serial(&comm_config, &mb_handle_);
+    if (err != ESP_OK || !mb_handle_) {
+        ESP_LOGE(TAG, "mbc_slave_create_serial failed: %s", esp_err_to_name(err));
         return false;
     }
 
-    // Configure UART pins (after mbc_slave_setup which creates the UART driver)
+    // Configure UART pins (after create which sets up the UART driver)
     uart_set_pin(UART_NUM_1, 27, 14, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
     // Register shadow arrays as Modbus areas
-    // Input registers (read-only)
+    // Input registers (read-only sensors/state)
     mb_register_area_descriptor_t input_area = {};
     input_area.type = MB_PARAM_INPUT;
     input_area.start_offset = 0;
     input_area.address = shadow_input_;
     input_area.size = sizeof(shadow_input_);
-    mbc_slave_set_descriptor(input_area);
+    input_area.access = MB_ACCESS_RO;
+    ESP_ERROR_CHECK(mbc_slave_set_descriptor(mb_handle_, input_area));
 
-    // Holding registers (read-write)
+    // Holding registers (read-write setpoints/config)
     mb_register_area_descriptor_t holding_area = {};
     holding_area.type = MB_PARAM_HOLDING;
     holding_area.start_offset = 0;
     holding_area.address = shadow_holding_;
     holding_area.size = sizeof(shadow_holding_);
-    mbc_slave_set_descriptor(holding_area);
+    holding_area.access = MB_ACCESS_RW;
+    ESP_ERROR_CHECK(mbc_slave_set_descriptor(mb_handle_, holding_area));
 
-    // Coils (read-only alarm bits)
+    // Coils (alarm bits)
     mb_register_area_descriptor_t coil_area = {};
     coil_area.type = MB_PARAM_COIL;
     coil_area.start_offset = 0;
     coil_area.address = shadow_coils_;
     coil_area.size = sizeof(shadow_coils_);
-    mbc_slave_set_descriptor(coil_area);
+    coil_area.access = MB_ACCESS_RO;
+    ESP_ERROR_CHECK(mbc_slave_set_descriptor(mb_handle_, coil_area));
 
     // Discrete inputs (relay states)
     mb_register_area_descriptor_t discrete_area = {};
@@ -152,13 +148,14 @@ bool ModbusService::start_modbus() {
     discrete_area.start_offset = 0;
     discrete_area.address = shadow_discrete_;
     discrete_area.size = sizeof(shadow_discrete_);
-    mbc_slave_set_descriptor(discrete_area);
+    discrete_area.access = MB_ACCESS_RO;
+    ESP_ERROR_CHECK(mbc_slave_set_descriptor(mb_handle_, discrete_area));
 
     // Start Modbus stack (creates internal FreeRTOS task)
-    err = mbc_slave_start();
+    err = mbc_slave_start(mb_handle_);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "mbc_slave_start failed: %s", esp_err_to_name(err));
-        mbc_slave_destroy();
+        mbc_slave_delete(mb_handle_);
         mb_handle_ = nullptr;
         return false;
     }
@@ -167,9 +164,10 @@ bool ModbusService::start_modbus() {
     ESP_LOGI(TAG, "Modbus RTU Slave started: addr=%d baud=%d parity=%d",
              (int)slave_address_, (int)baudrate_, (int)parity_);
 
-    // Initial sync
+    // Initial sync + snapshot for write detection
     if (state_) {
         sync_state_to_shadow();
+        memcpy(prev_holding_, shadow_holding_, sizeof(prev_holding_));
     }
 
     return true;
@@ -177,7 +175,8 @@ bool ModbusService::start_modbus() {
 
 void ModbusService::stop_modbus() {
     if (mb_handle_) {
-        mbc_slave_destroy();
+        mbc_slave_stop(mb_handle_);
+        mbc_slave_delete(mb_handle_);
         mb_handle_ = nullptr;
     }
     running_ = false;
@@ -248,24 +247,23 @@ void ModbusService::sync_state_to_shadow() {
 void ModbusService::sync_shadow_to_state() {
     if (!state_ || !mb_handle_) return;
 
-    // Check for master write events (non-blocking)
-    mb_param_info_t info = {};
-    esp_err_t err = mbc_slave_check_event(static_cast<mb_event_group_t>(MB_EVENT_HOLDING_REG_WR));
-    if (err != ESP_OK) return;  // No write events
+    // Detect master writes by comparing current shadow_holding_ with prev_holding_.
+    // esp-modbus updates shadow arrays directly in its own RTOS task.
+    // We NEVER call mbc_slave_check_event() — it BLOCKS until next Modbus frame!
+    bool any_changed = false;
 
-    // Get info about what was written
-    err = mbc_slave_get_param_info(&info, pdMS_TO_TICKS(10));
-    if (err != ESP_OK) return;
-
-    requests_total_++;
-
-    // Find which holding register was changed and update SharedState
     for (size_t i = 0; i < gen::MODBUS_HOLDING_REG_COUNT; ++i) {
         const auto& entry = gen::MODBUS_HOLDING_REGS[i];
         uint16_t offset = entry.address - 40001;
         if (offset >= sizeof(shadow_holding_) / sizeof(uint16_t)) continue;
 
-        int16_t raw = static_cast<int16_t>(shadow_holding_[offset]);
+        uint16_t current = shadow_holding_[offset];
+        if (current == prev_holding_[offset]) continue;  // No change
+
+        // Master wrote a new value — update SharedState
+        prev_holding_[offset] = current;
+        any_changed = true;
+        int16_t raw = static_cast<int16_t>(current);
 
         if (entry.type == 1) {  // float_x10
             float val = static_cast<float>(raw) / entry.scale;
@@ -275,6 +273,10 @@ void ModbusService::sync_shadow_to_state() {
         } else if (entry.type == 2) {  // bool
             state_->set(entry.state_key, raw != 0);
         }
+    }
+
+    if (any_changed) {
+        requests_total_++;
     }
 }
 
@@ -395,28 +397,25 @@ esp_err_t ModbusService::handle_post_modbus(httpd_req_t* req) {
 void ModbusService::register_http_handlers() {
     if (!server_ || http_registered_) return;
 
-    httpd_uri_t get_uri = {
-        .uri = "/api/modbus",
-        .method = HTTP_GET,
-        .handler = handle_get_modbus,
-        .user_ctx = this
-    };
+    httpd_uri_t get_uri = {};
+    get_uri.uri = "/api/modbus";
+    get_uri.method = HTTP_GET;
+    get_uri.handler = handle_get_modbus;
+    get_uri.user_ctx = this;
     httpd_register_uri_handler(server_, &get_uri);
 
-    httpd_uri_t post_uri = {
-        .uri = "/api/modbus",
-        .method = HTTP_POST,
-        .handler = handle_post_modbus,
-        .user_ctx = this
-    };
+    httpd_uri_t post_uri = {};
+    post_uri.uri = "/api/modbus";
+    post_uri.method = HTTP_POST;
+    post_uri.handler = handle_post_modbus;
+    post_uri.user_ctx = this;
     httpd_register_uri_handler(server_, &post_uri);
 
-    httpd_uri_t options_uri = {
-        .uri = "/api/modbus",
-        .method = HTTP_OPTIONS,
-        .handler = handle_options,
-        .user_ctx = this
-    };
+    httpd_uri_t options_uri = {};
+    options_uri.uri = "/api/modbus";
+    options_uri.method = HTTP_OPTIONS;
+    options_uri.handler = handle_options;
+    options_uri.user_ctx = this;
     httpd_register_uri_handler(server_, &options_uri);
 
     http_registered_ = true;

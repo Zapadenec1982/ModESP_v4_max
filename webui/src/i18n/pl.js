@@ -142,6 +142,7 @@ export default {
   'alert.saved': 'Zapisano!',
   'alert.saved_restart': 'Zapisano! Restart aby zastosować.',
   'alert.saved_mqtt': 'Zapisano! MQTT łączy ponownie...',
+  'alert.saved_modbus': 'Zapisano! Modbus restartuje...',
   'alert.error': 'Błąd zapisu',
   'alert.conn_error': 'Błąd połączenia',
   'alert.invalid_value': 'Nieprawidłowa wartość',

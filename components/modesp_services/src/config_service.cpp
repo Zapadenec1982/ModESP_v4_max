@@ -14,8 +14,6 @@
 #include <cstdlib>
 #include <cstring>
 
-// jsmn as header-only with JSMN_STATIC
-#define JSMN_STATIC
 #include "jsmn.h"
 
 static const char* TAG = "ConfigSvc";

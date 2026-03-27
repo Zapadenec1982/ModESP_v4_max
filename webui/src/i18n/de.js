@@ -142,6 +142,7 @@ export default {
   'alert.saved': 'Gespeichert!',
   'alert.saved_restart': 'Gespeichert! Neustart zum Übernehmen.',
   'alert.saved_mqtt': 'Gespeichert! MQTT verbindet neu...',
+  'alert.saved_modbus': 'Gespeichert! Modbus startet neu...',
   'alert.error': 'Speicherfehler',
   'alert.conn_error': 'Verbindungsfehler',
   'alert.invalid_value': 'Ungültiger Wert',

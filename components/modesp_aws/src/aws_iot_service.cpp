@@ -23,7 +23,6 @@
 #include "esp_wifi.h"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
-#define JSMN_STATIC
 #include "jsmn.h"
 
 #include <cstring>
