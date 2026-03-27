@@ -20,6 +20,9 @@
 #include "digital_input_driver.h"
 #include "ntc_driver.h"
 #include "pressure_adc_driver.h"
+#include "eev_analog_driver.h"
+#include "eev_stepper_driver.h"
+#include "akv_pulse_driver.h"
 #include "pcf8574_relay_driver.h"
 #include "pcf8574_input_driver.h"
 #include "esp_log.h"
@@ -52,6 +55,17 @@ static size_t pcf_relay_count = 0;
 
 static PCF8574InputDriver pcf_input_pool[MAX_SENSORS];
 static size_t pcf_input_count = 0;
+
+// Valve driver pools (max 2 valves per zone × 2 zones = 4)
+static constexpr size_t MAX_VALVES = 4;
+static EevAnalogDriver  eev_analog_pool[MAX_VALVES];
+static size_t eev_analog_count = 0;
+
+static EevStepperDriver eev_stepper_pool[MAX_VALVES];
+static size_t eev_stepper_count = 0;
+
+static AkvPulseDriver akv_pool[MAX_VALVES];
+static size_t akv_count = 0;
 
 // ═══════════════════════════════════════════════════════════════
 // Init — create all drivers from bindings
