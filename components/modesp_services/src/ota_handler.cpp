@@ -22,7 +22,7 @@
 #include <cstdio>
 #include <atomic>
 
-static const char* TAG = "OTA_HTTP";
+static const char TAG[] = "OTA_HTTP";
 
 namespace modesp {
 namespace ota_handler {

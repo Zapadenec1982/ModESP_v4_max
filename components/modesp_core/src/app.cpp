@@ -11,7 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-static const char* TAG = "App";
+static const char TAG[] = "App";
 
 namespace modesp {
 

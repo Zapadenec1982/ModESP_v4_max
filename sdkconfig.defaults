@@ -2,6 +2,9 @@
 # Board selection (idf.py menuconfig → ModESP Configuration)
 CONFIG_MODESP_BOARD_DEV=y
 
+# Modbus RTU Slave (RS-485)
+CONFIG_MODESP_MODBUS_ENABLED=y
+
 # OTA rollback support
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 CONFIG_APP_ROLLBACK_ENABLE=y
@@ -41,3 +44,12 @@ CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN=y
 CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
 # Do NOT enable FREE_CONFIG_DATA — breaks MQTT TLS reconnection
 # CONFIG_MBEDTLS_DYNAMIC_FREE_CONFIG_DATA is not set
+
+# ── WiFi RAM optimization ─────────────────────────────────────────
+# Move WiFi hot-path code from IRAM to flash (~17KB IRAM freed)
+# Trade-off: WiFi throughput -5-10%, negligible for MQTT/HTTP workload
+CONFIG_ESP_WIFI_IRAM_OPT=n
+CONFIG_ESP_WIFI_RX_IRAM_OPT=n
+
+# Reduce dynamic RX buffers (on-demand heap alloc, 24 sufficient)
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=24

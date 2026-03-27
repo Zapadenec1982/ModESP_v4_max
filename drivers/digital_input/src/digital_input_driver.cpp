@@ -9,7 +9,7 @@
 #include "digital_input_driver.h"
 #include "esp_log.h"
 
-static const char* TAG = "DigInput";
+static const char TAG[] = "DigInput";
 
 void DigitalInputDriver::configure(const char* role, gpio_num_t gpio,
                                    bool pull_up, bool invert) {

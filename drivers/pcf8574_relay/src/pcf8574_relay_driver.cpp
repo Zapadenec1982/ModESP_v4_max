@@ -6,7 +6,7 @@
 #include "pcf8574_relay_driver.h"
 #include "esp_log.h"
 
-static const char* TAG = "PCF8574Relay";
+static const char TAG[] = "PCF8574Relay";
 
 void PCF8574RelayDriver::configure(const char* role,
                                     modesp::I2CExpanderResource* expander,

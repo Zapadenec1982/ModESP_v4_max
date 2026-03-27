@@ -13,7 +13,7 @@
 #include "defrost_module.h"
 #include "esp_log.h"
 
-static const char* TAG = "Defrost";
+static const char TAG[] = "Defrost";
 
 // ═══════════════════════════════════════════════════════════════
 // Constructor

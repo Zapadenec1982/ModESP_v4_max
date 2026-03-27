@@ -36,7 +36,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 
-static const char* TAG = "HTTP";
+static const char TAG[] = "HTTP";
 
 namespace modesp {
 

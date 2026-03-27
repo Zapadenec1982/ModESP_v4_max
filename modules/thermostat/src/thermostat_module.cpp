@@ -21,7 +21,7 @@
 #include "esp_log.h"
 #include <ctime>
 
-static const char* TAG = "Thermostat";
+static const char TAG[] = "Thermostat";
 
 // ═══════════════════════════════════════════════════════════════
 // Constructor

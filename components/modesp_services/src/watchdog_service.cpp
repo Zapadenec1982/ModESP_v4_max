@@ -8,7 +8,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 
-static const char* TAG = "WatchdogSvc";
+static const char TAG[] = "WatchdogSvc";
 
 namespace modesp {
 

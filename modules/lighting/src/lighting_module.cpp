@@ -6,7 +6,7 @@
 #include "lighting_module.h"
 #include "esp_log.h"
 
-static const char* TAG = "Lighting";
+static const char TAG[] = "Lighting";
 
 LightingModule::LightingModule()
     : BaseModule("lighting", modesp::ModulePriority::NORMAL)

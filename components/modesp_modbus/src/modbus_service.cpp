@@ -13,12 +13,13 @@
 
 #include "mbcontroller.h"  // esp-modbus
 #include "esp_log.h"
+#include "esp_system.h"   // esp_get_free_heap_size
 #include "jsmn.h"
 
 #include <cstring>
 #include <cmath>
 
-static const char* TAG = "modbus";
+static const char TAG[] = "modbus";
 
 namespace modesp {
 
@@ -92,6 +93,11 @@ void ModbusService::on_stop() {
 // ═══════════════════════════════════════════════════════════════
 
 bool ModbusService::start_modbus() {
+    uint32_t heap_before = esp_get_free_heap_size();
+    ESP_LOGI(TAG, "MEM before Modbus init: free=%lu min=%lu",
+             (unsigned long)heap_before,
+             (unsigned long)esp_get_minimum_free_heap_size());
+
     // KC868-A6: RS485 via MAX13487EESA (auto-direction)
     // TX=GPIO27, RX=GPIO14, no RTS/DE needed (auto-direction chip)
     mb_communication_info_t comm_config = {};
@@ -161,8 +167,13 @@ bool ModbusService::start_modbus() {
     }
 
     running_ = true;
+    uint32_t heap_after = esp_get_free_heap_size();
     ESP_LOGI(TAG, "Modbus RTU Slave started: addr=%d baud=%d parity=%d",
              (int)slave_address_, (int)baudrate_, (int)parity_);
+    ESP_LOGW(TAG, "MEM after Modbus init: free=%lu min=%lu (delta=-%lu bytes)",
+             (unsigned long)heap_after,
+             (unsigned long)esp_get_minimum_free_heap_size(),
+             (unsigned long)(heap_before - heap_after));
 
     // Initial sync + snapshot for write detection
     if (state_) {

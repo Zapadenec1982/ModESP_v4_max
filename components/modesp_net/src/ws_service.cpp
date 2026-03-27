@@ -13,7 +13,7 @@
 #include <cstring>
 #include <cmath>
 
-static const char* TAG = "WS";
+static const char TAG[] = "WS";
 
 namespace modesp {
 

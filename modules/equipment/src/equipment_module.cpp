@@ -20,7 +20,7 @@
 #include <cstring>
 #include <cmath>
 
-static const char* TAG = "Equipment";
+static const char TAG[] = "Equipment";
 
 // ═══════════════════════════════════════════════════════════════
 // Constructor

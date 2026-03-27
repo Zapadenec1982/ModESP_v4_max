@@ -6,7 +6,7 @@
 #include "pcf8574_input_driver.h"
 #include "esp_log.h"
 
-static const char* TAG = "PCF8574Input";
+static const char TAG[] = "PCF8574Input";
 
 void PCF8574InputDriver::configure(const char* role,
                                     modesp::I2CExpanderResource* expander,

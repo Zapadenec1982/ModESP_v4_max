@@ -10,7 +10,7 @@
 
 #include <cstring>
 
-static const char* TAG = "NVS";
+static const char TAG[] = "NVS";
 
 namespace modesp {
 namespace nvs_helper {

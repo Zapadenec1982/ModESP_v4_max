@@ -20,7 +20,7 @@
 #include "freertos/semphr.h"
 #include "rom/ets_sys.h"
 
-static const char* TAG = "DS18B20";
+static const char TAG[] = "DS18B20";
 
 // М'ютекс OneWire шини — захист від конкурентного доступу між
 // DS18B20Driver::update() (main task) і scan_bus() (HTTP handler task).

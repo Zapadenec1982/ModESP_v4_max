@@ -24,7 +24,7 @@
 
 #include <cmath>   // fabsf, fmaxf
 
-static const char* TAG = "Protection";
+static const char TAG[] = "Protection";
 
 // ═══════════════════════════════════════════════════════════════
 // Constructor

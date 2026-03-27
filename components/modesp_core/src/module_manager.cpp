@@ -9,7 +9,7 @@
 
 #include "etl/algorithm.h"
 
-static const char* TAG = "ModuleManager";
+static const char TAG[] = "ModuleManager";
 
 namespace modesp {
 

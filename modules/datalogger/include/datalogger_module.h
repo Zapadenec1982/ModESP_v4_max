@@ -106,7 +106,7 @@ public:
 private:
     // ── RAM буфери ──
     etl::vector<TempRecord, 16>   temp_buf_;
-    etl::vector<EventRecord, 32>  event_buf_;
+    etl::vector<EventRecord, 24>  event_buf_;
 
     // ── Попередній стан для edge-detect ──
     bool prev_compressor_     = false;

@@ -16,13 +16,13 @@
 
 #include "jsmn.h"
 
-static const char* TAG = "ConfigSvc";
+static const char TAG[] = "ConfigSvc";
 
 // Спільний parse-буфер для board.json і bindings.json (boot-only, sequential calls)
 // Один набір замість двох static local — економія ~8 KB BSS
 namespace {
-static char s_json_buf[4096];
-static jsmntok_t s_json_tokens[512];
+static char s_json_buf[3072];
+static jsmntok_t s_json_tokens[350];
 }  // namespace
 
 namespace modesp {

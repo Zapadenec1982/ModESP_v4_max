@@ -9,9 +9,11 @@
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <ctime>
 
-static const char* TAG = "SystemMonitor";
+static const char TAG[] = "SystemMonitor";
 
 namespace modesp {
 
@@ -95,6 +97,21 @@ void SystemMonitor::on_update(uint32_t dt_ms) {
     if (free_heap > heap_warning_threshold) {
         heap_warning_sent_ = false;
         heap_critical_sent_ = false;
+    }
+
+    // Stack high water mark monitoring (every 30s)
+    hwm_elapsed_ms_ += dt_ms;
+    if (hwm_elapsed_ms_ >= HWM_INTERVAL_MS) {
+        hwm_elapsed_ms_ = 0;
+        // Log stack HWM for known tasks (name-based lookup)
+        static const char* task_names[] = {"main", "ota_http", "httpd", "mqtt", "modbus"};
+        for (const char* name : task_names) {
+            TaskHandle_t h = xTaskGetHandle(name);
+            if (h) {
+                UBaseType_t hwm = uxTaskGetStackHighWaterMark(h);
+                ESP_LOGI(TAG, "Stack HWM [%s]: %u bytes free", name, (unsigned)(hwm * sizeof(StackType_t)));
+            }
+        }
     }
 
     // Публікація поточного часу

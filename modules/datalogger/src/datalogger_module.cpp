@@ -23,7 +23,7 @@
 #include <cmath>
 #include <ctime>
 
-static const char* TAG = "DataLogger";
+static const char TAG[] = "DataLogger";
 
 DataLoggerModule::DataLoggerModule()
     : BaseModule("datalogger", modesp::ModulePriority::LOW)

@@ -6,7 +6,7 @@
 #include "modesp/logger_service.h"
 #include "esp_log.h"
 
-static const char* TAG = "LoggerSvc";
+static const char TAG[] = "LoggerSvc";
 
 namespace modesp {
 

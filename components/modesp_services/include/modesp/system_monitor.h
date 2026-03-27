@@ -36,6 +36,8 @@ private:
     uint32_t min_free_heap_ = UINT32_MAX;
     bool heap_warning_sent_ = false;
     bool heap_critical_sent_ = false;
+    uint32_t hwm_elapsed_ms_ = 0;
+    static constexpr uint32_t HWM_INTERVAL_MS = 30000;  // Stack HWM check every 30s
 };
 
 } // namespace modesp

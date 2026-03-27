@@ -28,7 +28,7 @@
 #include <cstring>
 #include <cstdio>
 
-static const char* TAG = "AwsIoT";
+static const char TAG[] = "AwsIoT";
 
 namespace modesp {
 

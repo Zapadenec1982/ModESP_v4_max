@@ -6,7 +6,7 @@
 #include "modesp/shared_state.h"
 #include "esp_log.h"
 
-static const char* TAG = "SharedState";
+static const char TAG[] = "SharedState";
 
 namespace modesp {
 

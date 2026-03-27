@@ -12,7 +12,7 @@
 #include "relay_driver.h"
 #include "esp_log.h"
 
-static const char* TAG = "Relay";
+static const char TAG[] = "Relay";
 
 // ═══════════════════════════════════════════════════════════════
 // Configure (called by DriverManager before init)

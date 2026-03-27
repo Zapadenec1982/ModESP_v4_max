@@ -16,7 +16,7 @@
 #include <cstdio>
 #include <algorithm>
 
-static const char* TAG = "WiFi";
+static const char TAG[] = "WiFi";
 
 namespace modesp {
 

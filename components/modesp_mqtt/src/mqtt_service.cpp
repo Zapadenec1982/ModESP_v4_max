@@ -28,7 +28,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-static const char* TAG = "MQTT";
+static const char TAG[] = "MQTT";
 
 namespace modesp {
 

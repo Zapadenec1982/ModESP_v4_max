@@ -25,7 +25,7 @@
 #include <cstdio>
 #include <cstring>
 
-static const char* TAG = "Persist";
+static const char TAG[] = "Persist";
 
 namespace modesp {
 

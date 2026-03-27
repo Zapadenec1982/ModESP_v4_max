@@ -13,7 +13,7 @@
 #include "esp_log.h"
 #include <cmath>
 
-static const char* TAG = "NTC";
+static const char TAG[] = "NTC";
 
 // Спільний ADC1 handle для всіх NTC instances.
 // adc_oneshot_new_unit(ADC_UNIT_1) можна викликати тільки ОДИН раз —
