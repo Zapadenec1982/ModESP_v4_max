@@ -11,7 +11,7 @@
     "datalogger",
     "eev"
   ],
-  "zone_count": 1,
+  "zone_count": 2,
   "zone_namespaces": {
     "thermostat": [
       "thermo_z1",
