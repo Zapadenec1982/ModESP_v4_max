@@ -4,6 +4,7 @@
  *
  * State machine:
  *   IDLE → STARTUP → RUNNING ↔ LOW_SH_PROTECT
+ *        ↘ EXERCISE (periodic unblock)
  *                  ↘ DEFROST → RUNNING
  *                  ↘ SENSOR_FAULT
  *
@@ -41,11 +42,13 @@ private:
         RUNNING,           // Normal PI regulation
         LOW_SH_PROTECT,    // Superheat dangerously low, aggressive close
         DEFROST,           // Defrost active, valve closed
-        SENSOR_FAULT       // Sensor failure, safe position
+        SENSOR_FAULT,      // Sensor failure, safe position
+        EXERCISE           // Periodic valve exercise (unblock stuck valve)
     };
 
     State state_ = State::IDLE;
     uint32_t state_timer_ms_ = 0;
+    uint32_t idle_elapsed_ms_ = 0;  // Time spent in IDLE (for exercise trigger)
 
     void enter_state(State new_state);
     const char* state_name() const;
@@ -73,6 +76,7 @@ private:
     float mop_pressure_ = 0.0f;    // MOP bar (0=disabled)
     float deadband_ = 1.0f;        // Anti-hunting deadband (K)
     uint32_t pi_interval_ms_ = 3000;  // PI calculation interval
+    uint32_t exercise_interval_ms_ = 86400000;  // Valve exercise interval (default 24h, 0=off)
 
     // ── Inputs cache ──
     float suction_bar_ = 0.0f;

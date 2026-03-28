@@ -48,6 +48,7 @@ void EevModule::sync_settings() {
     mop_pressure_   = read_float(ns_key("mop_pressure"), mop_pressure_);
     deadband_       = read_float(ns_key("deadband"), deadband_);
     pi_interval_ms_ = static_cast<uint32_t>(read_int(ns_key("pi_interval"), 3)) * 1000;
+    exercise_interval_ms_ = static_cast<uint32_t>(read_int(ns_key("exercise_interval"), 24)) * 3600000UL;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -62,6 +63,7 @@ const char* EevModule::state_name() const {
         case State::LOW_SH_PROTECT: return "low_sh";
         case State::DEFROST:        return "defrost";
         case State::SENSOR_FAULT:   return "fault";
+        case State::EXERCISE:       return "exercise";
     }
     return "unknown";
 }
@@ -75,7 +77,8 @@ void EevModule::enter_state(State new_state) {
              new_state == State::RUNNING        ? "running" :
              new_state == State::LOW_SH_PROTECT ? "low_sh" :
              new_state == State::DEFROST        ? "defrost" :
-             new_state == State::SENSOR_FAULT   ? "fault" : "?");
+             new_state == State::SENSOR_FAULT   ? "fault" :
+             new_state == State::EXERCISE       ? "exercise" : "?");
 
     state_ = new_state;
     state_timer_ms_ = 0;
@@ -84,6 +87,7 @@ void EevModule::enter_state(State new_state) {
         case State::IDLE:
             set_valve_position(0.0f);
             reset_pi();
+            idle_elapsed_ms_ = 0;
             break;
 
         case State::STARTUP:
@@ -115,6 +119,12 @@ void EevModule::enter_state(State new_state) {
             set_valve_position(safe_pos_);
             reset_pi();
             ESP_LOGW(TAG, "SENSOR FAULT — safe position %.0f%%", safe_pos_);
+            break;
+
+        case State::EXERCISE:
+            // Phase 1: open to max, Phase 2: close to 0 — unstick grit/deposits
+            set_valve_position(max_pos_);
+            ESP_LOGI(TAG, "Valve exercise: open→%.0f%%", max_pos_);
             break;
     }
 
@@ -228,6 +238,8 @@ void EevModule::on_update(uint32_t dt_ms) {
 
         // ── IDLE: compressor off, valve closed ──
         case State::IDLE:
+            idle_elapsed_ms_ += dt_ms;
+
             if (defrost_active_) {
                 enter_state(State::DEFROST);
             } else if (comp_rising) {
@@ -236,6 +248,10 @@ void EevModule::on_update(uint32_t dt_ms) {
                 } else {
                     enter_state(State::SENSOR_FAULT);
                 }
+            } else if (exercise_interval_ms_ > 0 &&
+                       idle_elapsed_ms_ >= exercise_interval_ms_ &&
+                       !defrost_active_) {
+                enter_state(State::EXERCISE);
             }
             break;
 
@@ -283,15 +299,7 @@ void EevModule::on_update(uint32_t dt_ms) {
                 break;
             }
 
-            // MOP check: close valve if suction pressure too high
-            if (mop_pressure_ > 0.0f && suction_bar_ > mop_pressure_) {
-                position_ -= 3.0f;  // Aggressive close
-                if (position_ < min_pos_) position_ = min_pos_;
-                set_valve_position(position_);
-                break;
-            }
-
-            // Low superheat protection
+            // Low superheat protection (highest priority — compressor safety)
             if (superheat_ < low_sh_limit_) {
                 enter_state(State::LOW_SH_PROTECT);
                 break;
@@ -300,7 +308,19 @@ void EevModule::on_update(uint32_t dt_ms) {
             // PI calculation at configured interval
             if (pi_timer_ms_ >= pi_interval_ms_) {
                 pi_timer_ms_ = 0;
-                update_pi(superheat_, sh_target_);
+
+                // MOP override: proportional close replaces PI when pressure too high.
+                // Rate scales with overpressure: 1%/interval at threshold → 8% at +3.5 bar.
+                // PI is suspended (not fighting MOP) but resumes immediately when cleared.
+                if (mop_pressure_ > 0.0f && suction_bar_ > mop_pressure_) {
+                    float over = suction_bar_ - mop_pressure_;
+                    float close_rate = 1.0f + over * 2.0f;  // 1..~8 %/interval
+                    if (close_rate > 8.0f) close_rate = 8.0f;
+                    position_ -= close_rate;
+                    if (position_ < min_pos_) position_ = min_pos_;
+                } else {
+                    update_pi(superheat_, sh_target_);
+                }
                 set_valve_position(position_);
             }
             break;
@@ -363,6 +383,30 @@ void EevModule::on_update(uint32_t dt_ms) {
                 } else {
                     enter_state(State::IDLE);
                 }
+            }
+            break;
+
+        // ── EXERCISE: periodic valve unblock (open→close cycle) ──
+        // Phase 1 (0-5s): valve at max_pos (entered via enter_state)
+        // Phase 2 (5-10s): valve at 0% (close)
+        // Done: return to IDLE
+        case State::EXERCISE:
+            // Abort if compressor starts or defrost begins
+            if (comp_rising || defrost_active_) {
+                set_valve_position(0.0f);
+                enter_state(compressor_on_ ? State::STARTUP : State::IDLE);
+                break;
+            }
+
+            if (state_timer_ms_ < 5000) {
+                // Phase 1: hold open (set in enter_state)
+            } else if (state_timer_ms_ < 10000) {
+                // Phase 2: close
+                set_valve_position(0.0f);
+            } else {
+                // Done
+                ESP_LOGI(TAG, "Valve exercise complete");
+                enter_state(State::IDLE);
             }
             break;
     }

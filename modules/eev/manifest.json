@@ -203,6 +203,15 @@
       "unit": "s",
       "description": "Інтервал розрахунку PI"
     },
+    "eev.exercise_interval": {
+      "type": "int",
+      "access": "readwrite",
+      "min": 0, "max": 168, "step": 1,
+      "default": 24,
+      "persist": true,
+      "unit": "год",
+      "description": "Інтервал розблокування клапана (0=вимкнено)"
+    },
     "eev.valve_type": {
       "type": "int",
       "access": "readwrite",
@@ -237,7 +246,7 @@
       "eev.startup_pos", "eev.startup_wait",
       "eev.min_pos", "eev.max_pos", "eev.safe_pos",
       "eev.low_sh_limit", "eev.mop_pressure", "eev.deadband",
-      "eev.pi_interval"
+      "eev.pi_interval", "eev.exercise_interval"
     ]
   },
 
@@ -292,7 +301,8 @@
           {"key": "eev.max_pos", "widget": "number_input", "label": "Макс. позиція", "unit": "%"},
           {"key": "eev.safe_pos", "widget": "number_input", "label": "Безпечна позиція", "unit": "%"},
           {"key": "eev.low_sh_limit", "widget": "number_input", "label": "Мін. перегрів", "unit": "K"},
-          {"key": "eev.mop_pressure", "widget": "number_input", "label": "MOP тиск", "unit": "bar"}
+          {"key": "eev.mop_pressure", "widget": "number_input", "label": "MOP тиск", "unit": "bar"},
+          {"key": "eev.exercise_interval", "widget": "number_input", "label": "Розблокування", "unit": "год"}
         ]
       }
     ]

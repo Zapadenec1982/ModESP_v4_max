@@ -29,6 +29,8 @@
   "state.eev.low_sh_limit.unit": "K",
   "state.eev.mop_pressure.description": "Max operating pressure (0=disabled)",
   "state.eev.mop_pressure.unit": "bar",
+  "state.eev.exercise_interval.description": "Valve exercise interval (0=disabled)",
+  "state.eev.exercise_interval.unit": "h",
   "state.eev.valve_type.description": "EEV valve type",
   "state.eev.max_steps.description": "Maximum steps",
   "page.eev": "EEV",
