@@ -224,7 +224,7 @@ I2C bus + PCF8574 expander підтримка в HAL:
 **Phase 2 (реалізовано 2026-03-28):**
 - [x] MOP proportional response (1+over*2 %/interval, cap 8%, всередині pi_timer)
 - [x] Valve exercise / unblock (open→close при idle > 24h, конфігурується 0-168h)
-- [ ] LOP protection (low evaporation pressure, optional — P3)
+- [x] LOP protection (low evaporation pressure, proportional open, default disabled)
 
 **Оцінка Phase 2:** 1-2 сесії
 

@@ -17,6 +17,13 @@
   - Stepper: закриття 150Hz замість 50Hz (3.2s vs 9.6s для E2V 480 кроків)
   - Раніше прапорець був dead code — emergency mode ніколи не активувався
 
+- **feat(eev): LOP protection (low evaporation pressure):**
+  - Дзеркальний до MOP: при тиску нижче lop_pressure відкриває клапан пропорційно
+  - Rate: `0.5 + under*1.5` (%/interval), cap 5% — м'якший ніж MOP (уникає liquid return)
+  - Guard: SH > low_sh_limit (LowSH завжди має пріоритет)
+  - Default 0 = вимкнено, параметр `eev.lop_pressure` (0-15 bar)
+  - Повний набір CAREL EVD mini protectors: LowSH + MOP + LOP
+
 - **feat(eev): MOP proportional response:**
   - Замість фіксованого 3%/10ms (300%/s!) — пропорційно: `1 + over*2` (%/interval), cap 8%
   - MOP всередині pi_timer (1x/3s) замість кожні 10ms
