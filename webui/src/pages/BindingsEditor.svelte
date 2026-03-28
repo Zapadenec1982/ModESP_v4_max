@@ -6,6 +6,7 @@
   import { t } from '../stores/i18n.js';
   import Card from '../components/Card.svelte';
   import NumberInput from '../components/widgets/NumberInput.svelte';
+  import SelectWidget from '../components/widgets/SelectWidget.svelte';
   import EquipmentStatus from './bindings/EquipmentStatus.svelte';
   import BindingCard from './bindings/BindingCard.svelte';
   import OneWireDiscovery from './bindings/OneWireDiscovery.svelte';
@@ -189,6 +190,46 @@
       {$t['bind.required']}: {missingRequired.map(r => r.label).join(', ')}
     </div>
   {/if}
+
+  <!-- Installation settings (zones, refrigerant) -->
+  <Card title={$t['bind.installation'] || 'Налаштування установки'} icon="settings" iconColor="var(--accent)">
+    <NumberInput
+      config={{ key: 'equipment.active_zones', description: $t['eq.active_zones'] || 'Кількість активних зон', min: 1, max: 2, step: 1, editable: true }}
+      value={$state['equipment.active_zones']}
+    />
+    <SelectWidget
+      config={{
+        key: 'equipment.refrigerant',
+        description: $t['eq.refrigerant'] || 'Тип холодоагенту',
+        options: [
+          {value: 0, label: 'R134a'},
+          {value: 1, label: 'R404A'},
+          {value: 2, label: 'R507A'},
+          {value: 3, label: 'R290 (пропан)'},
+          {value: 4, label: 'R448A'},
+          {value: 5, label: 'R449A'},
+          {value: 6, label: 'R452A'},
+          {value: 7, label: 'R407A'},
+          {value: 8, label: 'R407C'},
+          {value: 9, label: 'R407F'},
+          {value: 10, label: 'R410A'},
+          {value: 11, label: 'R32'},
+          {value: 12, label: 'R454A'},
+          {value: 13, label: 'R454B'},
+          {value: 14, label: 'R744 (CO₂)'},
+          {value: 15, label: 'R717 (NH₃)'},
+          {value: 16, label: 'R22'},
+          {value: 17, label: 'R600a (ізобутан)'},
+          {value: 18, label: 'R513A'},
+          {value: 19, label: 'R1234yf'},
+          {value: 20, label: 'R1234ze'},
+          {value: 21, label: 'R455A'},
+          {value: 22, label: 'R1270 (пропілен)'}
+        ]
+      }}
+      value={$state['equipment.refrigerant']}
+    />
+  </Card>
 
   <!-- Live equipment status -->
   {#if assignedRoles.size > 0}
