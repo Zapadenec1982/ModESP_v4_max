@@ -200,9 +200,11 @@ void EevModule::on_update(uint32_t dt_ms) {
     refrigerant_idx_ = read_input_int("equipment.refrigerant", 0);
 
     // 3. Calculate saturation temperature and superheat
+    //    Use dew_point_temp() — correct for zeotropic blends (glide > 0).
+    //    For azeotropes (glide=0) returns identical to saturation_temp().
     if (pressure_ok_ && suction_bar_ > 0.0f) {
         auto ref = static_cast<modesp::Refrigerant>(refrigerant_idx_);
-        t_sat_ = modesp::saturation_temp(ref, suction_bar_);
+        t_sat_ = modesp::dew_point_temp(ref, suction_bar_);
         superheat_ = evap_temp_ - t_sat_;
     } else {
         t_sat_ = NAN;

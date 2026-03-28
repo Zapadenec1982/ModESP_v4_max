@@ -560,7 +560,14 @@ void EquipmentModule::apply_outputs() {
 
     // Block H: EEV valve output — apply to IValveDriver if bound (single-zone)
     if (eev_driver_) {
-        eev_driver_->set_value(out_.valve_pos / 100.0f);  // 0-100% → 0.0-1.0
+        // Emergency close request from EEV module (subcooled SH < 0)
+        // Uses emergency_stop() → IValveDriver::emergency_close() at 150Hz
+        if (read_input_bool("eev.req.emergency_close")) {
+            eev_driver_->emergency_stop();
+            state_set("eev.req.emergency_close", false);  // ACK — одноразовий прапорець
+        } else {
+            eev_driver_->set_value(out_.valve_pos / 100.0f);  // 0-100% → 0.0-1.0
+        }
     }
 }
 
