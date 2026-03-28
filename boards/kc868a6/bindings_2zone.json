@@ -1,0 +1,25 @@
+{
+  "description": "KC868-A6 — 2-zone refrigeration (shared compressor, per-zone evaporators)",
+  "bindings": [
+    {"hardware": "relay_1", "driver": "pcf8574_relay", "role": "compressor",       "module": "equipment"},
+    {"hardware": "relay_2", "driver": "pcf8574_relay", "role": "cond_fan",         "module": "equipment"},
+    {"hardware": "relay_3", "driver": "pcf8574_relay", "role": "evap_fan_z1",      "module": "equipment"},
+    {"hardware": "relay_4", "driver": "pcf8574_relay", "role": "evap_fan_z2",      "module": "equipment"},
+    {"hardware": "relay_5", "driver": "pcf8574_relay", "role": "defrost_relay_z1", "module": "equipment"},
+    {"hardware": "relay_6", "driver": "pcf8574_relay", "role": "defrost_relay_z2", "module": "equipment"},
+
+    {"hardware": "ow_1",   "driver": "ds18b20", "role": "air_temp",     "module": "equipment", "address": ""},
+    {"hardware": "ow_1",   "driver": "ds18b20", "role": "evap_temp_z1", "module": "equipment", "address": ""},
+    {"hardware": "ow_2",   "driver": "ds18b20", "role": "evap_temp_z2", "module": "equipment", "address": ""},
+
+    {"hardware": "adc_1",  "driver": "pressure_adc", "role": "suction_p_z1", "module": "equipment", "params": {"p_range": 60.0}},
+    {"hardware": "adc_2",  "driver": "pressure_adc", "role": "suction_p_z2", "module": "equipment", "params": {"p_range": 60.0}},
+    {"hardware": "adc_3",  "driver": "pressure_adc", "role": "discharge_p",  "module": "equipment", "params": {"p_range": 60.0}},
+
+    {"hardware": "dac_1",  "driver": "eev_analog", "role": "eev_z1", "module": "equipment"},
+    {"hardware": "dac_2",  "driver": "eev_analog", "role": "eev_z2", "module": "equipment"},
+
+    {"hardware": "din_1",  "driver": "pcf8574_input", "role": "door_contact", "module": "equipment"},
+    {"hardware": "din_2",  "driver": "pcf8574_input", "role": "night_input",  "module": "equipment"}
+  ]
+}

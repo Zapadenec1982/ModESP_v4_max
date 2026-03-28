@@ -31,9 +31,16 @@
     {"id": "ow_2", "gpio": 33, "label": "OneWire шина 2"}
   ],
   "adc_channels": [
-    {"id": "adc_1", "gpio": 36, "atten": 3, "label": "ADC 1 (0-3.3V)"},
-    {"id": "adc_2", "gpio": 39, "atten": 3, "label": "ADC 2 (0-3.3V)"},
-    {"id": "adc_3", "gpio": 34, "atten": 3, "label": "ADC 3 (0-3.3V)"},
-    {"id": "adc_4", "gpio": 35, "atten": 3, "label": "ADC 4 (0-3.3V)"}
+    {"id": "adc_1", "gpio": 36, "atten": 3, "label": "ADC 1 (0-5V via LM224)"},
+    {"id": "adc_2", "gpio": 39, "atten": 3, "label": "ADC 2 (0-5V via LM224)"},
+    {"id": "adc_3", "gpio": 34, "atten": 3, "label": "ADC 3 (0-5V via LM224)"},
+    {"id": "adc_4", "gpio": 35, "atten": 3, "label": "ADC 4 (0-5V via LM224)"}
+  ],
+  "dac_channels": [
+    {"id": "dac_1", "gpio": 25, "label": "DAC 1 (0-10V via LM258)"},
+    {"id": "dac_2", "gpio": 26, "label": "DAC 2 (0-10V via LM258)"}
+  ],
+  "uart_buses": [
+    {"id": "rs485", "tx_gpio": 27, "rx_gpio": 14, "label": "RS-485 (MAX13487, auto DE)"}
   ]
 }
