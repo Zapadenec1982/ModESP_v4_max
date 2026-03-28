@@ -202,6 +202,28 @@
       "persist": true,
       "unit": "s",
       "description": "PI calculation interval"
+    },
+    "eev.valve_type": {
+      "type": "int",
+      "access": "readwrite",
+      "persist": true,
+      "default": 0,
+      "options": [
+        {"value": 0, "label": "Не підключено"},
+        {"value": 1, "label": "E2V stepper (PCF8574 → H-bridge)"},
+        {"value": 2, "label": "E2V analog (DAC 0-10V → EVD Mini)"},
+        {"value": 3, "label": "AKV solenoid (PWM)"},
+        {"value": 4, "label": "E2V stepper (GPIO → TMC2209)"}
+      ],
+      "description": "Тип клапана EEV"
+    },
+    "eev.max_steps": {
+      "type": "int",
+      "access": "readwrite",
+      "persist": true,
+      "min": 100, "max": 6400, "step": 10,
+      "default": 480,
+      "description": "Макс. кроків клапана (E2V=480, ETS=600, EX=750)"
     }
   },
 
@@ -223,6 +245,16 @@
     "page": "EEV",
     "icon": "thermometer",
     "cards": [
+      {
+        "title": "Клапан",
+        "icon": "settings",
+        "subtitle": "Тип та параметри клапана",
+        "columns": 2,
+        "widgets": [
+          {"key": "eev.valve_type", "widget": "select", "label": "Тип клапана"},
+          {"key": "eev.max_steps", "widget": "number_input", "label": "Макс. кроків", "visible_when": {"key": "eev.valve_type", "op": "in", "value": [1, 2, 4]}}
+        ]
+      },
       {
         "title": "Перегрів",
         "icon": "thermometer",

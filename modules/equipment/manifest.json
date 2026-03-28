@@ -117,6 +117,55 @@
     ]
   },
 
+  "ui": {
+    "page": "Обладнання",
+    "icon": "link",
+    "cards": [
+      {
+        "title": "Зони",
+        "icon": "layers",
+        "subtitle": "Кількість зон охолодження",
+        "columns": 2,
+        "widgets": [
+          {"key": "equipment.active_zones", "widget": "number_input", "label": "Активні зони", "unit": ""},
+          {"key": "equipment.refrigerant", "widget": "select", "label": "Холодоагент",
+           "options": [
+             {"value": 0, "label": "R134a"},
+             {"value": 1, "label": "R404A"},
+             {"value": 2, "label": "R507A"},
+             {"value": 3, "label": "R290 (пропан)"},
+             {"value": 4, "label": "R448A"},
+             {"value": 5, "label": "R449A"},
+             {"value": 6, "label": "R407C"},
+             {"value": 7, "label": "R410A"},
+             {"value": 8, "label": "R32"},
+             {"value": 9, "label": "R744 (CO2)"},
+             {"value": 10, "label": "R717 (аміак)"},
+             {"value": 11, "label": "R22"}
+           ]
+          }
+        ]
+      },
+      {
+        "title": "Датчики",
+        "icon": "thermometer",
+        "subtitle": "Калібрування та фільтрація",
+        "columns": 2,
+        "widgets": [
+          {"key": "equipment.filter_coeff", "widget": "number_input", "label": "Цифровий фільтр"},
+          {"key": "equipment.ds18b20_offset", "widget": "number_input", "label": "Корекція DS18B20", "unit": "°C",
+           "visible_when": {"key": "equipment.has_ds18b20_driver", "value": true}},
+          {"key": "equipment.ntc_beta", "widget": "number_input", "label": "NTC Beta",
+           "visible_when": {"key": "equipment.has_ntc_driver", "value": true}},
+          {"key": "equipment.ntc_r_series", "widget": "number_input", "label": "NTC R послідовний", "unit": "Ω",
+           "visible_when": {"key": "equipment.has_ntc_driver", "value": true}},
+          {"key": "equipment.ntc_r_nominal", "widget": "number_input", "label": "NTC R номінальний", "unit": "Ω",
+           "visible_when": {"key": "equipment.has_ntc_driver", "value": true}}
+        ]
+      }
+    ]
+  },
+
   "display": {
     "main_value": {
       "key": "equipment.air_temp",
