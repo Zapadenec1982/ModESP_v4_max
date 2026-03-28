@@ -19,8 +19,30 @@
     currentPage = id;
   }
 
-  $: currentTitle = $pages.find((p) => p.id === currentPage)?.title || "";
-  $: sortedPages = [...$pages].sort((a, b) => (a.order || 0) - (b.order || 0));
+  // Zone-aware page filtering and renaming
+  // active_zones from SharedState (runtime, set by Equipment module)
+  $: activeZones = parseInt($state["equipment.active_zones"]) || 1;
+
+  // Zone page IDs that should be hidden/renamed based on active zones
+  // Zone 2 pages: id ends with "_z2" (thermo_z2, defrost_z2, eev_z2)
+  $: filteredPages = $pages.filter((p) => {
+    // Hide zone 2+ pages when only 1 zone active
+    if (activeZones < 2 && p.id && p.id.endsWith("_z2")) return false;
+    if (activeZones < 3 && p.id && p.id.endsWith("_z3")) return false;
+    if (activeZones < 4 && p.id && p.id.endsWith("_z4")) return false;
+    return true;
+  });
+
+  // When single zone: remove " Z1" suffix from page titles
+  $: displayPages = filteredPages.map((p) => {
+    if (activeZones === 1 && p.title && p.title.endsWith(" Z1")) {
+      return { ...p, title: p.title.slice(0, -3) };
+    }
+    return p;
+  });
+
+  $: currentTitle = displayPages.find((p) => p.id === currentPage)?.title || "";
+  $: sortedPages = [...displayPages].sort((a, b) => (a.order || 0) - (b.order || 0));
 
   // Mobile bottom tabs: max 4 visible + "More" if > 5 pages
   const MAX_TABS = 4;
