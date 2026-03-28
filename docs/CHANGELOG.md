@@ -2,6 +2,26 @@
 
 > Повний changelog проекту.
 
+## 2026-03-28
+
+- **fix(eev): superheat calculation — dew point для зеотропних сумішей:**
+  - `saturation_temp()` → `dew_point_temp()` в PI контролері
+  - Для azeotropes (glide=0): результат ідентичний, без змін поведінки
+  - Для зеотропних сумішей (10 з 23): виправлена помилка до 5.65K (R455A)
+  - Вплив: R404A (+0.25K), R407C (+2.95K), R448A (+2.7K), R449A (+2.5K),
+    R452A (+1.85K), R407A/F (+2.65K), R454A (+2.7K), R454B (+0.6K), R455A (+5.65K)
+
+- **fix(eev): emergency close wiring в Equipment module:**
+  - EEV модуль при subcooled (SH < 0) встановлює `req.emergency_close`
+  - Equipment тепер читає прапорець → `IValveDriver::emergency_close()`
+  - Stepper: закриття 150Hz замість 50Hz (3.2s vs 9.6s для E2V 480 кроків)
+  - Раніше прапорець був dead code — emergency mode ніколи не активувався
+
+- **docs: аналіз CAREL EVD mini (+0300036EN) vs ModESP EEV:**
+  - Velocity-form PI (ModESP) vs classic PID (CAREL) — наш кращий (anti-windup)
+  - LowSH/MOP захист — реалізовано, subcooled emergency — тільки в ModESP
+  - Знайдено: відсутній LOP, MOP oscillation, valve exercise (Phase 2 roadmap)
+
 ## 2026-03-16
 
 - **feat(i18n): мультимовний інтерфейс (UK/EN/DE/PL):**

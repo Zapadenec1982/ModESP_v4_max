@@ -1,6 +1,6 @@
 # ModESP v4 — Дорожня карта розвитку
 
-> Останнє оновлення: 2026-03-07
+> Останнє оновлення: 2026-03-28
 > Платформа: ESP32-WROOM-32, ESP-IDF v5.5, C++17 + ETL
 
 ---
@@ -208,14 +208,25 @@ I2C bus + PCF8574 expander підтримка в HAL:
 
 **Оцінка:** 3-4 сесії
 
-### Phase 11c — PID + Advanced Sensors
-**Пріоритет:** СЕРЕДНІЙ.
+### Phase 11c — EEV Superheat Control (реалізовано 2026-03-28)
 
-- [ ] PID регулювання (замість on/off гістерезису)
-- [ ] Pressure sensor підтримка
-- [x] ~~SEARCH_ROM — auto-learn DS18B20 через WebUI (scan → assign → save)~~ (Phase 11b)
+Модуль EEV — PI контроль перегріву через електронний розширювальний клапан:
+- [x] Velocity-form PI регулятор (anti-windup, bumpless transfer, deadband)
+- [x] 6 станів: IDLE → STARTUP → RUNNING ↔ LOW_SH_PROTECT, DEFROST, SENSOR_FAULT
+- [x] 4 типи клапанів: E2V stepper (GPIO/PCF8574), DAC 0-10V, AKV PWM solenoid
+- [x] 23 холодоагенти (Antoine equation, Danfoss/NIST RefProp 10.0)
+- [x] Zeotropic glide compensation (dew_point_temp для сумішей)
+- [x] MOP protection (max operating pressure)
+- [x] LowSH + subcooled emergency close (150Hz)
+- [x] Sensor fault → safe position (40%)
+- [x] Pressure sensor (ratiometric) підтримка
 
-**Оцінка:** 2-3 сесії
+**Phase 2 (planned):**
+- [ ] MOP proportional response (замість фіксованого 3%/cycle)
+- [ ] Valve exercise / unblock (periodic cycle для запобігання заклинюванню)
+- [ ] LOP protection (low evaporation pressure, optional)
+
+**Оцінка Phase 2:** 1-2 сесії
 
 ### Phase 11d — Advanced Algorithms (Danfoss-inspired)
 **Пріоритет:** СЕРЕДНІЙ.
