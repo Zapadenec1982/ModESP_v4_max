@@ -31,6 +31,10 @@ ThermostatModule::ThermostatModule()
     : BaseModule("thermostat", modesp::ModulePriority::NORMAL)
 {}
 
+ThermostatModule::ThermostatModule(const char* ns, etl::span<const modesp::InputBinding> inputs)
+    : BaseModule("thermostat", ns, modesp::ModulePriority::NORMAL, inputs)
+{}
+
 // ═══════════════════════════════════════════════════════════════
 // Sync settings з SharedState (WebUI/API може їх змінити)
 // ═══════════════════════════════════════════════════════════════

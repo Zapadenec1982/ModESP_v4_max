@@ -11,6 +11,27 @@
     "datalogger",
     "eev"
   ],
+  "zone_count": 1,
+  "zone_namespaces": {
+    "thermostat": [
+      "thermo_z1",
+      "thermo_z2",
+      "thermo_z3",
+      "thermo_z4"
+    ],
+    "defrost": [
+      "defrost_z1",
+      "defrost_z2",
+      "defrost_z3",
+      "defrost_z4"
+    ],
+    "eev": [
+      "eev_z1",
+      "eev_z2",
+      "eev_z3",
+      "eev_z4"
+    ]
+  },
   "system": {
     "device_name": "ModESP",
     "pages": {

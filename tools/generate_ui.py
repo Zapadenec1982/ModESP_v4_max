@@ -671,6 +671,86 @@ class FeatureResolver:
 
 
 # ═══════════════════════════════════════════════════════════════
+#  Multi-Zone Helpers
+# ═══════════════════════════════════════════════════════════════
+
+def is_zone_module(project, module_name):
+    """Check if module_name is a zone module (present in zone_namespaces)."""
+    return module_name in project.get("zone_namespaces", {})
+
+
+def get_zone_count(project):
+    """Get effective zone count from project config."""
+    return project.get("zone_count", 1)
+
+
+def expand_zone_entries(project, module_name, entries):
+    """Expand entries for multi-zone modules.
+
+    Args:
+        project: project.json dict
+        module_name: e.g. "thermostat", "defrost", "eev"
+        entries: list of (full_key, info) pairs where full_key is "thermostat.setpoint" etc.
+
+    Returns:
+        list of (namespace, original_module_name, new_key, info) tuples.
+        When zone_count=1: returns [(module_name, module_name, original_key, info), ...]
+        When zone_count>1 for zone modules: returns expanded entries with namespace prefix.
+        Non-zone modules always return as-is regardless of zone_count.
+    """
+    zone_count = get_zone_count(project)
+    zone_ns = project.get("zone_namespaces", {})
+
+    if zone_count <= 1 or module_name not in zone_ns:
+        # Single zone or non-zone module: return as-is
+        return [(module_name, module_name, key, info) for key, info in entries]
+
+    # Multi-zone: expand for each active zone namespace
+    result = []
+    prefix = module_name + "."
+    for z in range(zone_count):
+        ns = zone_ns[module_name][z]
+        for key, info in entries:
+            if key.startswith(prefix):
+                suffix = key[len(prefix):]
+                new_key = f"{ns}.{suffix}"
+            else:
+                new_key = key  # fallback
+            result.append((ns, module_name, new_key, info))
+    return result
+
+
+def expand_zone_keys_list(project, module_name, keys):
+    """Expand a flat list of keys for multi-zone.
+
+    Args:
+        project: project.json dict
+        module_name: e.g. "thermostat"
+        keys: list of full keys like ["thermostat.temperature", "thermostat.setpoint"]
+
+    Returns:
+        list of expanded keys. When zone_count=1, returns keys unchanged.
+    """
+    zone_count = get_zone_count(project)
+    zone_ns = project.get("zone_namespaces", {})
+
+    if zone_count <= 1 or module_name not in zone_ns:
+        return list(keys)
+
+    prefix = module_name + "."
+    result = []
+    for z in range(zone_count):
+        ns = zone_ns[module_name][z]
+        for key in keys:
+            if key.startswith(prefix):
+                suffix = key[len(prefix):]
+                result.append(f"{ns}.{suffix}")
+            else:
+                result.append(key)
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════
 #  UI JSON Generator  (data/ui.json)
 # ═══════════════════════════════════════════════════════════════
 
@@ -706,12 +786,22 @@ class UIJsonGenerator:
         if sys_pages.get("dashboard", True):
             pages.append(self._dashboard_page(manifests))
         # Module pages (inserted between dashboard and system pages)
+        zone_count = get_zone_count(project)
+        zone_ns = project.get("zone_namespaces", {})
         for m in manifests:
             ui = m.get("ui")
             if not ui:
                 continue
-            page = self._module_page(m, ui)
-            pages.append(page)
+            mod_name = m.get("module", "?")
+            if zone_count > 1 and is_zone_module(project, mod_name):
+                # Multi-zone: create separate page per zone
+                for z in range(zone_count):
+                    ns = zone_ns[mod_name][z]
+                    page = self._module_page_zone(m, ui, ns, z + 1, mod_name)
+                    pages.append(page)
+            else:
+                page = self._module_page(m, ui)
+                pages.append(page)
         # Bindings page (equipment overview)
         if bindings and board:
             # Витягуємо requires з equipment manifest
@@ -736,7 +826,10 @@ class UIJsonGenerator:
         # Build state_meta for frontend
         state_meta = {}
         for m in manifests:
-            for key, info in m.get("state", {}).items():
+            mod_name = m.get("module", "?")
+            raw_entries = list(m.get("state", {}).items())
+            expanded = expand_zone_entries(project, mod_name, raw_entries)
+            for ns, orig_mod, new_key, info in expanded:
                 entry = {
                     "type": info.get("type", "string"),
                     "access": info.get("access", "read"),
@@ -750,7 +843,7 @@ class UIJsonGenerator:
                         for prop in ("min", "max", "step"):
                             if prop in info:
                                 entry[prop] = info[prop]
-                state_meta[key] = entry
+                state_meta[new_key] = entry
 
         return {
             "device_name": sys_cfg.get("device_name", "ModESP"),
@@ -788,6 +881,63 @@ class UIJsonGenerator:
                 page_card["widgets"].append(widget)
             page["cards"].append(page_card)
         return page
+
+    def _module_page_zone(self, manifest, ui, namespace, zone_num, orig_module):
+        """Build page for a specific zone of a zone module.
+
+        Replaces all widget keys: "thermostat.setpoint" → "thermo_z1.setpoint"
+        Appends " Z{n}" to page title.
+        """
+        prefix = orig_module + "."
+        page = {
+            "id": f"{namespace}",
+            "title": f"{ui.get('page', orig_module)} Z{zone_num}",
+            "icon": ui.get("icon", "cube"),
+            "order": ui.get("order", 50) + (zone_num - 1) * 0.1,
+            "module": namespace,
+            "cards": [],
+        }
+        for card in ui.get("cards", []):
+            page_card = {"title": card["title"], "widgets": []}
+            if "group" in card:
+                page_card["group"] = card["group"]
+            if card.get("collapsible"):
+                page_card["collapsible"] = True
+            if "visible_when" in card:
+                vw = dict(card["visible_when"])
+                # Remap visible_when key to zone namespace
+                if vw.get("key", "").startswith(prefix):
+                    vw["key"] = namespace + "." + vw["key"][len(prefix):]
+                page_card["visible_when"] = vw
+            for opt_field in ("icon", "icon_color", "subtitle", "summary_keys", "wide"):
+                if opt_field in card:
+                    page_card[opt_field] = card[opt_field]
+
+            for w in card.get("widgets", []):
+                widget = self._build_widget_zone(w, manifest, namespace, prefix)
+                page_card["widgets"].append(widget)
+            page["cards"].append(page_card)
+        return page
+
+    def _build_widget_zone(self, w, manifest, namespace, prefix):
+        """Build a widget with keys remapped to zone namespace."""
+        orig_key = w["key"]
+        if orig_key.startswith(prefix):
+            key = namespace + "." + orig_key[len(prefix):]
+        else:
+            key = orig_key
+
+        widget = self._build_widget(w, manifest)
+        # Override key and i18n_key with zone-namespaced version
+        widget["key"] = key
+        widget["i18n_key"] = f"state.{orig_key}"  # i18n stays on original key
+        # Remap visible_when keys too
+        if "visible_when" in widget:
+            vw = dict(widget["visible_when"])
+            if vw.get("key", "").startswith(prefix):
+                vw["key"] = namespace + "." + vw["key"][len(prefix):]
+            widget["visible_when"] = vw
+        return widget
 
     def _build_widget(self, w, manifest):
         """Build a widget dict with state metadata merged in."""
@@ -1296,9 +1446,21 @@ class UIJsonGenerator:
 class StateMetaGenerator:
     """Generates generated/state_meta.h — constexpr metadata for API validation."""
 
-    def generate(self, manifests):
+    def generate(self, manifests, project=None):
+        if project is None:
+            project = {}
+
         # Підрахунок ВСІХ state keys з маніфестів для auto-capacity
-        total_manifest_keys = sum(len(m.get("state", {})) for m in manifests)
+        # For zone modules, multiply keys by zone_count
+        zone_count = get_zone_count(project)
+        total_manifest_keys = 0
+        for m in manifests:
+            n_keys = len(m.get("state", {}))
+            mod_name = m.get("module", "?")
+            if zone_count > 1 and is_zone_module(project, mod_name):
+                total_manifest_keys += n_keys * zone_count
+            else:
+                total_manifest_keys += n_keys
         capacity = total_manifest_keys + 48  # +48 для runtime ключів (_ota.*, wifi.*, mqtt.*, modbus.*, system.*)
 
         lines = [
@@ -1327,11 +1489,17 @@ class StateMetaGenerator:
         ]
 
         # Include readwrite keys AND read-only keys with persist=true
+        # Expand zone module entries for multi-zone
         rw_entries = []
         for m in manifests:
-            for key, info in m.get("state", {}).items():
-                if info.get("access") == "readwrite" or info.get("persist", False):
-                    rw_entries.append((key, info))
+            mod_name = m.get("module", "?")
+            raw_entries = [
+                (key, info) for key, info in m.get("state", {}).items()
+                if info.get("access") == "readwrite" or info.get("persist", False)
+            ]
+            expanded = expand_zone_entries(project, mod_name, raw_entries)
+            for ns, orig_mod, new_key, info in expanded:
+                rw_entries.append((new_key, info))
 
         lines.append("static constexpr StateMeta STATE_META[] = {")
         if rw_entries:
@@ -1386,13 +1554,16 @@ class StateMetaGenerator:
 class MqttTopicsGenerator:
     """Generates generated/mqtt_topics.h"""
 
-    def generate(self, manifests):
+    def generate(self, manifests, project=None):
+        if project is None:
+            project = {}
         pub_keys = []
         sub_keys = []
         for m in manifests:
+            mod_name = m.get("module", "?")
             mqtt = m.get("mqtt", {})
-            pub_keys.extend(mqtt.get("publish", []))
-            sub_keys.extend(mqtt.get("subscribe", []))
+            pub_keys.extend(expand_zone_keys_list(project, mod_name, mqtt.get("publish", [])))
+            sub_keys.extend(expand_zone_keys_list(project, mod_name, mqtt.get("subscribe", [])))
 
         lines = [
             "#pragma once",
@@ -1503,7 +1674,12 @@ class DisplayScreensGenerator:
 class StateKeysGenerator:
     """Generates generated/module_keys.h — enum + short names per module for namespace resolver."""
 
-    def generate(self, manifests):
+    def generate(self, manifests, project=None):
+        if project is None:
+            project = {}
+        zone_count = get_zone_count(project)
+        zone_ns = project.get("zone_namespaces", {})
+
         lines = [
             "#pragma once",
             "// Auto-generated by generate_ui.py — DO NOT EDIT",
@@ -1532,25 +1708,48 @@ class StateKeysGenerator:
                     short = full_key  # fallback for weird keys
                 short_keys.append((full_key, short))
 
-            # Generate enum class
-            enum_name = module_name.capitalize() + "Key"
-            lines.append(f"// ─── {module_name} ({len(short_keys)} keys) ───")
-            lines.append(f"enum class {enum_name} : uint8_t {{")
-            for i, (full_key, short) in enumerate(short_keys):
-                # Convert "req.compressor" → "REQ_COMPRESSOR"
-                enum_val = short.upper().replace(".", "_")
-                lines.append(f"    {enum_val} = {i},  // {full_key}")
-            lines.append(f"    COUNT = {len(short_keys)}")
-            lines.append("};")
-            lines.append("")
+            if zone_count > 1 and is_zone_module(project, module_name):
+                # Multi-zone: generate per-zone enums and arrays
+                for z in range(zone_count):
+                    ns = zone_ns[module_name][z]
+                    # Convert namespace to CamelCase for enum: "thermo_z1" → "ThermoZ1"
+                    enum_name = "".join(part.capitalize() for part in ns.split("_")) + "Key"
+                    array_name = ns.upper() + "_KEY_NAMES"
 
-            # Generate short names array (stored in flash via constexpr)
-            array_name = module_name.upper() + "_KEY_NAMES"
-            lines.append(f"inline constexpr const char* {array_name}[] = {{")
-            for full_key, short in short_keys:
-                lines.append(f'    "{short}",  // {full_key}')
-            lines.append("};")
-            lines.append("")
+                    lines.append(f"// ─── {ns} ({len(short_keys)} keys, zone {z+1} of {module_name}) ───")
+                    lines.append(f"enum class {enum_name} : uint8_t {{")
+                    for i, (full_key, short) in enumerate(short_keys):
+                        enum_val = short.upper().replace(".", "_")
+                        new_key = f"{ns}.{short}"
+                        lines.append(f"    {enum_val} = {i},  // {new_key}")
+                    lines.append(f"    COUNT = {len(short_keys)}")
+                    lines.append("};")
+                    lines.append("")
+
+                    lines.append(f"inline constexpr const char* {array_name}[] = {{")
+                    for full_key, short in short_keys:
+                        new_key = f"{ns}.{short}"
+                        lines.append(f'    "{short}",  // {new_key}')
+                    lines.append("};")
+                    lines.append("")
+            else:
+                # Single-instance module (or zone_count=1): original behavior
+                enum_name = module_name.capitalize() + "Key"
+                lines.append(f"// ─── {module_name} ({len(short_keys)} keys) ───")
+                lines.append(f"enum class {enum_name} : uint8_t {{")
+                for i, (full_key, short) in enumerate(short_keys):
+                    enum_val = short.upper().replace(".", "_")
+                    lines.append(f"    {enum_val} = {i},  // {full_key}")
+                lines.append(f"    COUNT = {len(short_keys)}")
+                lines.append("};")
+                lines.append("")
+
+                array_name = module_name.upper() + "_KEY_NAMES"
+                lines.append(f"inline constexpr const char* {array_name}[] = {{")
+                for full_key, short in short_keys:
+                    lines.append(f'    "{short}",  // {full_key}')
+                lines.append("};")
+                lines.append("")
 
         # Cross-module input keys (for InputBinding defaults)
         lines.append("// ─── Cross-module input defaults ───")
@@ -1897,7 +2096,7 @@ def main():
 
     # 2. state_meta.h
     meta_gen = StateMetaGenerator()
-    meta_h = meta_gen.generate(manifests)
+    meta_h = meta_gen.generate(manifests, project)
     meta_path = gen_dir / "state_meta.h"
     with open(meta_path, "w", encoding="utf-8") as f:
         f.write(meta_h)
@@ -1906,7 +2105,7 @@ def main():
 
     # 3. mqtt_topics.h
     mqtt_gen = MqttTopicsGenerator()
-    mqtt_h = mqtt_gen.generate(manifests)
+    mqtt_h = mqtt_gen.generate(manifests, project)
     mqtt_path = gen_dir / "mqtt_topics.h"
     with open(mqtt_path, "w", encoding="utf-8") as f:
         f.write(mqtt_h)
@@ -1937,7 +2136,7 @@ def main():
 
     # 6. module_keys.h (enum + short names for namespace resolver)
     keys_gen = StateKeysGenerator()
-    keys_h = keys_gen.generate(manifests)
+    keys_h = keys_gen.generate(manifests, project)
     keys_path = gen_dir / "module_keys.h"
     with open(keys_path, "w", encoding="utf-8") as f:
         f.write(keys_h)

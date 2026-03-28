@@ -40,4 +40,16 @@ menu "ModESP Configuration"
             Enables Modbus RTU Slave on UART1 via RS-485 (KC868-A6).
             Register map auto-generated from module manifests.
             Adds ~15KB RAM, ~23KB Flash.
+
+    config MODESP_ZONE_COUNT
+        int "Number of refrigeration zones"
+        default 1
+        range 1 4
+        help
+            Number of independent refrigeration zones per controller.
+            1 = single zone (default, backward compatible).
+            2-4 = multi-zone: separate thermostat/defrost/EEV per zone,
+            shared compressor and condenser fan.
+            Each zone adds ~10KB RAM (module instances + state keys).
+            Requires per-zone bindings in bindings.json.
 endmenu

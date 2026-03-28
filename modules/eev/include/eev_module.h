@@ -28,6 +28,7 @@
 class EevModule : public modesp::BaseModule {
 public:
     EevModule();
+    EevModule(const char* ns, etl::span<const modesp::InputBinding> inputs);
 
     bool on_init() override;
     void on_update(uint32_t dt_ms) override;

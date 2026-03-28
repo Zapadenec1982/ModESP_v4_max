@@ -51,7 +51,11 @@
 
 class ThermostatModule : public modesp::BaseModule {
 public:
+    /// Single-zone constructor (backward compatible, ns = "thermostat")
     ThermostatModule();
+
+    /// Multi-zone constructor (ns = "thermo_z1", "thermo_z2", etc.)
+    ThermostatModule(const char* ns, etl::span<const modesp::InputBinding> inputs);
 
     bool on_init() override;
     void on_update(uint32_t dt_ms) override;

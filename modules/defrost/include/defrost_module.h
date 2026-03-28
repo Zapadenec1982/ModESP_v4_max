@@ -56,6 +56,7 @@
 class DefrostModule : public modesp::BaseModule {
 public:
     DefrostModule();
+    DefrostModule(const char* ns, etl::span<const modesp::InputBinding> inputs);
 
     bool on_init() override;
     void on_update(uint32_t dt_ms) override;

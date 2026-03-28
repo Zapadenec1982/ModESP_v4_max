@@ -27,6 +27,10 @@ EevModule::EevModule()
     : BaseModule("eev", modesp::ModulePriority::NORMAL)
 {}
 
+EevModule::EevModule(const char* ns, etl::span<const modesp::InputBinding> inputs)
+    : BaseModule("eev", ns, modesp::ModulePriority::NORMAL, inputs)
+{}
+
 // ═══════════════════════════════════════════════════════════════
 // Settings sync from SharedState
 // ═══════════════════════════════════════════════════════════════
