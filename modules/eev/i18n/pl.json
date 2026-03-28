@@ -29,6 +29,8 @@
   "state.eev.low_sh_limit.unit": "K",
   "state.eev.mop_pressure.description": "Maks. ciśnienie robocze (0=wyłączone)",
   "state.eev.mop_pressure.unit": "bar",
+  "state.eev.lop_pressure.description": "Min. ciśnienie robocze (0=wyłączone)",
+  "state.eev.lop_pressure.unit": "bar",
   "state.eev.exercise_interval.description": "Interwał ćwiczenia zaworu (0=wyłączone)",
   "state.eev.exercise_interval.unit": "godz",
   "state.eev.valve_type.description": "Typ zaworu EEV",

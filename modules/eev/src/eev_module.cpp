@@ -46,6 +46,7 @@ void EevModule::sync_settings() {
     safe_pos_       = read_float(ns_key("safe_pos"), safe_pos_);
     low_sh_limit_   = read_float(ns_key("low_sh_limit"), low_sh_limit_);
     mop_pressure_   = read_float(ns_key("mop_pressure"), mop_pressure_);
+    lop_pressure_   = read_float(ns_key("lop_pressure"), lop_pressure_);
     deadband_       = read_float(ns_key("deadband"), deadband_);
     pi_interval_ms_ = static_cast<uint32_t>(read_int(ns_key("pi_interval"), 3)) * 1000;
     exercise_interval_ms_ = static_cast<uint32_t>(read_int(ns_key("exercise_interval"), 24)) * 3600000UL;
@@ -309,15 +310,24 @@ void EevModule::on_update(uint32_t dt_ms) {
             if (pi_timer_ms_ >= pi_interval_ms_) {
                 pi_timer_ms_ = 0;
 
-                // MOP override: proportional close replaces PI when pressure too high.
-                // Rate scales with overpressure: 1%/interval at threshold → 8% at +3.5 bar.
-                // PI is suspended (not fighting MOP) but resumes immediately when cleared.
+                // MOP override: proportional close when pressure too high.
+                // LOP override: proportional open when pressure too low.
+                // Both replace PI for the cycle, resume immediately when cleared.
                 if (mop_pressure_ > 0.0f && suction_bar_ > mop_pressure_) {
                     float over = suction_bar_ - mop_pressure_;
                     float close_rate = 1.0f + over * 2.0f;  // 1..~8 %/interval
                     if (close_rate > 8.0f) close_rate = 8.0f;
                     position_ -= close_rate;
                     if (position_ < min_pos_) position_ = min_pos_;
+                } else if (lop_pressure_ > 0.0f && suction_bar_ < lop_pressure_ &&
+                           superheat_ > low_sh_limit_) {
+                    // LOP: open valve to raise suction pressure (starved evaporator).
+                    // Guard: only when SH is safe (not subcooled) — LowSH has priority.
+                    float under = lop_pressure_ - suction_bar_;
+                    float open_rate = 0.5f + under * 1.5f;  // 0.5..~5 %/interval
+                    if (open_rate > 5.0f) open_rate = 5.0f;  // Gentler than MOP
+                    position_ += open_rate;
+                    if (position_ > max_pos_) position_ = max_pos_;
                 } else {
                     update_pi(superheat_, sh_target_);
                 }
