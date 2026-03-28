@@ -949,12 +949,13 @@ class UIJsonGenerator:
         return page
 
     def _build_widget_zone(self, w, manifest, namespace, prefix):
-        """Build a widget with keys remapped to zone namespace."""
+        """Build a widget with keys remapped to zone namespace.
+
+        Remaps ALL zone module prefixes (not just own prefix) to the same zone number.
+        E.g., for zone 1 defrost module: "thermostat.display_defrost" → "thermo_z1.display_defrost"
+        """
         orig_key = w["key"]
-        if orig_key.startswith(prefix):
-            key = namespace + "." + orig_key[len(prefix):]
-        else:
-            key = orig_key
+        key = self._remap_zone_key(orig_key, prefix, namespace)
 
         widget = self._build_widget(w, manifest)
         # Override key and i18n_key with zone-namespaced version
@@ -963,10 +964,41 @@ class UIJsonGenerator:
         # Remap visible_when keys too
         if "visible_when" in widget:
             vw = dict(widget["visible_when"])
-            if vw.get("key", "").startswith(prefix):
-                vw["key"] = namespace + "." + vw["key"][len(prefix):]
+            vw_key = vw.get("key", "")
+            vw["key"] = self._remap_zone_key(vw_key, prefix, namespace)
             widget["visible_when"] = vw
         return widget
+
+    def _remap_zone_key(self, key, own_prefix, own_namespace):
+        """Remap a state key to the correct zone namespace.
+
+        1. Own module prefix ("defrost.") → own namespace ("defrost_z1.")
+        2. Other zone module prefix ("thermostat.") → same zone number ("thermo_z1.")
+        3. Non-zone keys (equipment.*, protection.*) → unchanged
+        """
+        # Own module
+        if key.startswith(own_prefix):
+            return own_namespace + "." + key[len(own_prefix):]
+
+        # Other zone modules — extract zone number from own_namespace
+        # e.g., own_namespace="defrost_z1" → zone_suffix="_z1"
+        zone_suffix = ""
+        for i in range(len(own_namespace) - 1, -1, -1):
+            if own_namespace[i] == '_':
+                zone_suffix = own_namespace[i:]  # "_z1"
+                break
+
+        if zone_suffix and hasattr(self, '_project') and self._project:
+            zone_ns = self._project.get("zone_namespaces", {})
+            for mod, namespaces in zone_ns.items():
+                mod_prefix = mod + "."
+                if key.startswith(mod_prefix) and mod_prefix != own_prefix:
+                    # Find the namespace with the same zone suffix
+                    for ns in namespaces:
+                        if ns.endswith(zone_suffix):
+                            return ns + "." + key[len(mod_prefix):]
+
+        return key  # Non-zone key — unchanged
 
     def _build_widget(self, w, manifest):
         """Build a widget dict with state metadata merged in."""
