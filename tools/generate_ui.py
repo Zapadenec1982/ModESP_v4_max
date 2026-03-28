@@ -759,6 +759,9 @@ class UIJsonGenerator:
 
     def generate(self, project, manifests, driver_manifests=None,
                  board=None, bindings=None, resolver=None):
+        # Зберігаємо project для zone key remapping в _module_page
+        self._project = project
+
         # Глобальна карта всіх state keys з усіх модулів (для cross-module widget keys)
         self._all_state = {}
         for m in manifests:
@@ -855,7 +858,12 @@ class UIJsonGenerator:
         }
 
     def _module_page(self, manifest, ui):
-        """Build page from module UI section."""
+        """Build page from module UI section.
+
+        For non-zone modules (protection, datalogger): remap cross-module keys
+        that reference zone modules to Zone 1 namespace.
+        E.g., "thermostat.min_off_time" → "thermo_z1.min_off_time"
+        """
         page = {
             "id": ui.get("page_id", manifest["module"]),
             "title": ui.get("page", manifest["module"]),
@@ -864,6 +872,17 @@ class UIJsonGenerator:
             "module": manifest["module"],
             "cards": [],
         }
+
+        # Build zone key replacement map: {"thermostat.": "thermo_z1.", "defrost.": "defrost_z1.", ...}
+        zone_remap = {}
+        if hasattr(self, '_project') and self._project:
+            zone_ns = self._project.get("zone_namespaces", {})
+            zone_count = self._project.get("zone_count", 1)
+            if zone_count > 1:
+                for mod, namespaces in zone_ns.items():
+                    if namespaces:
+                        zone_remap[mod + "."] = namespaces[0] + "."  # Zone 1
+
         for card in ui.get("cards", []):
             page_card = {"title": card["title"], "widgets": []}
             if "group" in card:
@@ -871,13 +890,23 @@ class UIJsonGenerator:
             if card.get("collapsible"):
                 page_card["collapsible"] = True
             if "visible_when" in card:
-                page_card["visible_when"] = card["visible_when"]
+                vw = dict(card["visible_when"])
+                # Remap visible_when key
+                for old_prefix, new_prefix in zone_remap.items():
+                    if vw.get("key", "").startswith(old_prefix):
+                        vw["key"] = new_prefix + vw["key"][len(old_prefix):]
+                page_card["visible_when"] = vw
             for opt_field in ("icon", "icon_color", "subtitle", "summary_keys", "wide"):
                 if opt_field in card:
                     page_card[opt_field] = card[opt_field]
 
             for w in card.get("widgets", []):
                 widget = self._build_widget(w, manifest)
+                # Remap cross-module keys to Zone 1 namespace
+                for old_prefix, new_prefix in zone_remap.items():
+                    if widget["key"].startswith(old_prefix):
+                        widget["key"] = new_prefix + widget["key"][len(old_prefix):]
+                        widget["i18n_key"] = f"state.{widget['key']}"
                 page_card["widgets"].append(widget)
             page["cards"].append(page_card)
         return page

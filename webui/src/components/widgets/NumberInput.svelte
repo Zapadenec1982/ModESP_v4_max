@@ -9,7 +9,8 @@
   $: min = config.min ?? 0;
   $: max = config.max ?? 100;
   $: step = config.step ?? 1;
-  $: display = value !== undefined && value !== null ? value : "—";
+  // Force string — ensures 0 displays as "0", not empty input
+  $: display = value !== undefined && value !== null ? String(value) : "—";
 
   const sender = createSettingSender(config.key);
   const { pending, flashOk, cleanup } = sender;

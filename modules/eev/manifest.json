@@ -252,7 +252,7 @@
         "columns": 2,
         "widgets": [
           {"key": "eev.valve_type", "widget": "select", "label": "Тип клапана"},
-          {"key": "eev.max_steps", "widget": "number_input", "label": "Макс. кроків", "visible_when": {"key": "eev.valve_type", "op": "in", "value": [1, 2, 4]}}
+          {"key": "eev.max_steps", "widget": "number_input", "label": "Макс. кроків", "visible_when": {"key": "eev.valve_type", "neq": 0}}
         ]
       },
       {

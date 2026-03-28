@@ -154,13 +154,13 @@
         "widgets": [
           {"key": "equipment.filter_coeff", "widget": "number_input", "label": "Цифровий фільтр"},
           {"key": "equipment.ds18b20_offset", "widget": "number_input", "label": "Корекція DS18B20", "unit": "°C",
-           "visible_when": {"key": "equipment.has_ds18b20_driver", "value": true}},
+           "visible_when": {"key": "equipment.has_ds18b20_driver", "eq": true}},
           {"key": "equipment.ntc_beta", "widget": "number_input", "label": "NTC Beta",
-           "visible_when": {"key": "equipment.has_ntc_driver", "value": true}},
+           "visible_when": {"key": "equipment.has_ntc_driver", "eq": true}},
           {"key": "equipment.ntc_r_series", "widget": "number_input", "label": "NTC R послідовний", "unit": "Ω",
-           "visible_when": {"key": "equipment.has_ntc_driver", "value": true}},
+           "visible_when": {"key": "equipment.has_ntc_driver", "eq": true}},
           {"key": "equipment.ntc_r_nominal", "widget": "number_input", "label": "NTC R номінальний", "unit": "Ω",
-           "visible_when": {"key": "equipment.has_ntc_driver", "value": true}}
+           "visible_when": {"key": "equipment.has_ntc_driver", "eq": true}}
         ]
       }
     ]
