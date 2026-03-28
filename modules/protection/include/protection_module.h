@@ -134,7 +134,7 @@ private:
 
     // Логіка існуючих моніторів
     void update_high_temp(float temp, bool sensor_ok, bool defrost_active, uint32_t dt_ms);
-    void update_low_temp(float temp, bool sensor_ok, uint32_t dt_ms);
+    void update_low_temp(float temp, bool sensor_ok, bool suppress, uint32_t dt_ms);
     void update_sensor_alarm(AlarmMonitor& m, bool sensor_ok, const char* label);
     void update_door_alarm(bool door_open, uint32_t dt_ms);
     void update_condenser_alarm(float cond_temp, bool has_cond, uint32_t dt_ms);
@@ -200,6 +200,10 @@ private:
     bool     post_defrost_suppression_ = false;
     uint32_t post_defrost_timer_ms_    = 0;
     uint32_t post_defrost_delay_ms_    = 1800000;  // 30 хв default
+
+    // Continuous cycle suppression (low_temp + continuous_run)
+    bool     cc_suppress_active_       = false;    // suppress під час та після CC
+    uint32_t cc_bypass_remaining_ms_   = 0;        // bypass timer після CC
 
     // Кешований код аварії
     const char* alarm_code_ = "none";

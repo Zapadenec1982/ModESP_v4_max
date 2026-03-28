@@ -233,7 +233,7 @@ class TestProtectionManifest:
 
     def test_has_14_inputs(self, protection):
         """Protection має 14 inputs (7 data + 5 thermostat UI-only + 2 defrost)."""
-        assert len(protection["inputs"]) == 17
+        assert len(protection["inputs"]) == 19
 
     def test_required_inputs(self, protection):
         """Обов'язкові inputs: equipment.air_temp, equipment.sensor1_ok."""

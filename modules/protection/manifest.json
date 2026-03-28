@@ -76,6 +76,18 @@
       "description": "Порогова T випарника для demand defrost (icing detection)",
       "optional": true
     },
+    "thermostat.cc_remaining": {
+      "source_module": "thermostat",
+      "type": "int",
+      "description": "Залишок безперервного циклу (хв) для suppress алармів",
+      "optional": true
+    },
+    "thermostat.cc_alarm_bypass": {
+      "source_module": "thermostat",
+      "type": "int",
+      "description": "Bypass тривоги після CC (хв)",
+      "optional": true
+    },
     "thermostat.min_off_time": {
       "source_module": "thermostat",
       "type": "int",

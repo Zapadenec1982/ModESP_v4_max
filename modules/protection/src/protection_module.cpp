@@ -191,12 +191,39 @@ void ProtectionModule::on_update(uint32_t dt_ms) {
     // Сумарний suppress для HAL + Rate alarm: heating-фази відтайки АБО post-defrost
     bool suppress_high = defrost_heating || post_defrost_suppression_;
 
-    // 3a. Перевіряємо команду скидання аварій
+    // 3b. Continuous Cycle suppression — блокуємо low_temp + continuous_run під час CC
+    int32_t cc_remaining = read_input_int("thermostat.cc_remaining", 0);
+    if (cc_remaining > 0) {
+        // CC активний — suppress
+        cc_suppress_active_ = true;
+        cc_bypass_remaining_ms_ = 0;
+    } else if (cc_suppress_active_ && cc_remaining == 0 && cc_bypass_remaining_ms_ == 0) {
+        // CC щойно завершився — запускаємо bypass timer
+        int32_t bypass_min = read_input_int("thermostat.cc_alarm_bypass", 60);
+        cc_bypass_remaining_ms_ = static_cast<uint32_t>(bypass_min) * 60000;
+        ESP_LOGI(TAG, "CC ended — low_temp bypass %ld min", static_cast<long>(bypass_min));
+    }
+
+    if (cc_suppress_active_ && cc_remaining == 0) {
+        // Bypass timer countdown
+        if (cc_bypass_remaining_ms_ > 0) {
+            cc_bypass_remaining_ms_ = (dt_ms < cc_bypass_remaining_ms_)
+                                      ? cc_bypass_remaining_ms_ - dt_ms : 0;
+        }
+        if (cc_bypass_remaining_ms_ == 0) {
+            cc_suppress_active_ = false;
+            ESP_LOGI(TAG, "CC low_temp suppression ended");
+        }
+    }
+
+    bool suppress_low = cc_suppress_active_;
+
+    // 3c. Перевіряємо команду скидання аварій
     check_reset_command();
 
     // 4. Оновлюємо існуючі монітори
     update_high_temp(air_temp, sensor1_ok, suppress_high, dt_ms);
-    update_low_temp(air_temp, sensor1_ok, dt_ms);
+    update_low_temp(air_temp, sensor1_ok, suppress_low, dt_ms);
     update_sensor_alarm(sensor1_, sensor1_ok, "SENSOR1 (ERR1)");
     // sensor2 (evap_temp) — тільки якщо датчик підключений в bindings
     if (read_input_bool("equipment.has_evap_temp")) {
@@ -325,7 +352,14 @@ void ProtectionModule::update_high_temp(float temp, bool sensor_ok,
 // Low Temp alarm з dAd затримкою (завжди активний)
 // ═══════════════════════════════════════════════════════════════
 
-void ProtectionModule::update_low_temp(float temp, bool sensor_ok, uint32_t dt_ms) {
+void ProtectionModule::update_low_temp(float temp, bool sensor_ok, bool suppress, uint32_t dt_ms) {
+    // Suppress під час Continuous Cycle (+ bypass після)
+    if (suppress) {
+        low_temp_.pending = false;
+        low_temp_.pending_ms = 0;
+        return;
+    }
+
     // Не можемо перевірити без датчика
     if (!sensor_ok) {
         low_temp_.pending = false;
@@ -505,8 +539,8 @@ void ProtectionModule::update_compressor_tracker(bool compressor_on, float temp,
 
     // 8. Continuous Run з ескалацією: forced off → defrost → retry → lockout
 
-    // Guard: не рахуємо continuous run під час defrost (hot gas = нормальна робота)
-    if (!defrost_active) {
+    // Guard: не рахуємо continuous run під час defrost або Continuous Cycle (pulldown)
+    if (!defrost_active && !cc_suppress_active_) {
 
     // Forced off таймер: компресор заблоковано, вентилятори працюють
     if (forced_off_active_) {
