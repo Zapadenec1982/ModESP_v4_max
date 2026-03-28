@@ -159,6 +159,29 @@ void PersistService::restore_from_nvs() {
     if (migrated > 0) {
         ESP_LOGI(TAG, "Migrated %d keys from legacy positional format", migrated);
     }
+
+    // Phase 2: Set defaults for ALL readwrite keys that are NOT yet in SharedState.
+    // This covers non-persist readwrite keys (e.g., defrost.type, evap_fan_mode)
+    // that were previously never initialized → empty selects/fields in WebUI.
+    int defaults_set = 0;
+    for (size_t i = 0; i < gen::STATE_META_COUNT; i++) {
+        const auto& meta = gen::STATE_META[i];
+        if (!meta.writable) continue;        // skip read-only keys
+        if (meta.persist) continue;          // already handled above
+        if (ext_state_->has(meta.key)) continue;  // already set by module or NVS
+
+        if (strcmp(meta.type, "float") == 0) {
+            ext_state_->set(meta.key, meta.default_val);
+        } else if (strcmp(meta.type, "int") == 0) {
+            ext_state_->set(meta.key, static_cast<int32_t>(meta.default_val));
+        } else if (strcmp(meta.type, "bool") == 0) {
+            ext_state_->set(meta.key, meta.default_val != 0.0f);
+        }
+        defaults_set++;
+    }
+    if (defaults_set > 0) {
+        ESP_LOGI(TAG, "Set %d non-persist readwrite defaults", defaults_set);
+    }
 }
 
 void PersistService::on_state_changed(const StateKey& key, const StateValue& value, void* user_data) {
