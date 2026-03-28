@@ -315,8 +315,8 @@ void WsService::send_full_state_to(int fd) {
     }
 
     // Серіалізуємо повний state для нового клієнта (heap, не stack!)
-    // 154 entries × ~35 bytes avg = ~5.4KB потрібно
-    static constexpr size_t BUF_SIZE = 6144;
+    // 2-zone: ~250 entries × ~35 bytes avg = ~8.7KB потрібно
+    static constexpr size_t BUF_SIZE = 10240;
     char* buf = static_cast<char*>(malloc(BUF_SIZE));
     if (!buf) {
         ESP_LOGW(TAG, "No memory for serialize buf to fd=%d", fd);
