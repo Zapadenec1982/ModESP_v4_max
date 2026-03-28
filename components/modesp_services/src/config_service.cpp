@@ -21,6 +21,7 @@ static const char TAG[] = "ConfigSvc";
 // Спільний parse-буфер для board.json і bindings.json (boot-only, sequential calls)
 // Один набір замість двох static local — економія ~8 KB BSS
 namespace {
+// ⚠️ Буфери ПОВИННІ збігатись з ConfigService::MAX_JSON_SIZE (3072) і MAX_TOKENS (350)!
 static char s_json_buf[3072];
 static jsmntok_t s_json_tokens[350];
 }  // namespace
