@@ -56,6 +56,9 @@
     "equipment.has_eev":         {"type": "bool",  "access": "read", "description": "EEV клапан доступний"},
     "equipment.suction_bar":     {"type": "float", "access": "read", "unit": "bar", "description": "Тиск всмоктування"},
     "equipment.discharge_bar":   {"type": "float", "access": "read", "unit": "bar", "description": "Тиск нагнітання"},
+    "equipment.active_zones":    {"type": "int",   "access": "readwrite", "persist": true,
+                                  "min": 1, "max": 4, "step": 1, "default": 1,
+                                  "description": "Кількість активних зон (1-4, runtime)"},
     "equipment.refrigerant":     {"type": "int",   "access": "readwrite", "persist": true,
                                   "min": 0, "max": 22, "step": 1, "default": 0,
                                   "description": "Тип холодоагенту (0=R134a, 1=R404A, ...)"},
@@ -71,6 +74,10 @@
     "equipment.has_suction_p_z2":     {"type": "bool", "access": "read", "description": "Датчик тиску зона 2 доступний"},
     "equipment.has_defrost_relay_z1": {"type": "bool", "access": "read", "description": "Реле відтайки зона 1 доступне"},
     "equipment.has_defrost_relay_z2": {"type": "bool", "access": "read", "description": "Реле відтайки зона 2 доступне"},
+
+    "equipment.zone2_enabled":  {"type": "bool", "access": "read", "description": "Зона 2 активна (runtime)"},
+    "equipment.zone3_enabled":  {"type": "bool", "access": "read", "description": "Зона 3 активна (runtime)"},
+    "equipment.zone4_enabled":  {"type": "bool", "access": "read", "description": "Зона 4 активна (runtime)"},
 
     "equipment.filter_coeff":    {"type": "int", "access": "readwrite", "persist": true,
                                   "min": 0, "max": 10, "step": 1, "default": 4,

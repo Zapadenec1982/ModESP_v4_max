@@ -148,6 +148,13 @@ protected:
         return ns_buf_;
     }
 
+    /// Check if this module's zone is enabled (runtime activation).
+    /// Zone 1 modules have no "equipment.zone_enabled" binding → default true (always active).
+    /// Zone 2+ modules bind "equipment.zone_enabled" → "equipment.zone2_enabled" etc.
+    bool is_zone_enabled() const {
+        return read_input_bool("equipment.zone_enabled", true);
+    }
+
     /// Resolve all keys for a module from short names array into pre-built keys
     /// Called once in on_init(). After this, keys[KeyEnum] is a fully-qualified StateKey.
     /// @param short_names  Array of short key names (from generated module_keys.h)

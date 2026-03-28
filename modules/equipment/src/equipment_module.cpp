@@ -110,6 +110,18 @@ bool EquipmentModule::on_init() {
         return false;
     }
 
+    // Runtime zone count from NVS (persisted via equipment.active_zones)
+    zone_count_ = static_cast<size_t>(read_int(ns_key("active_zones"), 1));
+    if (zone_count_ < 1) zone_count_ = 1;
+    if (zone_count_ > MAX_ZONES) zone_count_ = MAX_ZONES;
+    state_set(ns_key("active_zones"), static_cast<int32_t>(zone_count_));
+    ESP_LOGI(TAG, "Active zones: %d", (int)zone_count_);
+
+    // Publish zone enable flags — zone modules check this to skip on_update()
+    state_set("equipment.zone2_enabled", zone_count_ >= 2);
+    state_set("equipment.zone3_enabled", zone_count_ >= 3);
+    state_set("equipment.zone4_enabled", zone_count_ >= 4);
+
     // Початковий стан в SharedState
     // Оптимістична ініціалізація: sensor_ok = true щоб Protection
     // не спрацьовувала ERR1/ERR2 до першого реального read().
@@ -185,6 +197,16 @@ bool EquipmentModule::on_init() {
 }
 
 void EquipmentModule::on_update(uint32_t dt_ms) {
+    // Runtime zone count update (WebUI can change equipment.active_zones)
+    auto new_zones = static_cast<size_t>(read_int(ns_key("active_zones"), 1));
+    if (new_zones >= 1 && new_zones <= MAX_ZONES && new_zones != zone_count_) {
+        zone_count_ = new_zones;
+        state_set("equipment.zone2_enabled", zone_count_ >= 2);
+        state_set("equipment.zone3_enabled", zone_count_ >= 3);
+        state_set("equipment.zone4_enabled", zone_count_ >= 4);
+        ESP_LOGI(TAG, "Zone count changed to %d", (int)zone_count_);
+    }
+
     // AUDIT-003: оновлюємо таймер компресора
     comp_since_ms_ += dt_ms;
     if (comp_since_ms_ > modesp::TIMER_SATISFIED) comp_since_ms_ = modesp::TIMER_SATISFIED;

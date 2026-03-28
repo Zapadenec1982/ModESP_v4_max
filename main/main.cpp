@@ -111,8 +111,8 @@ static EquipmentModule         equipment;
 static ProtectionModule        protection;
 
 // Business modules (NORMAL priority — work through SharedState)
-// Multi-zone: conditional compilation based on Kconfig MODESP_ZONE_COUNT
-#if CONFIG_MODESP_ZONE_COUNT >= 2
+// Always compiled for 2 zones. Zone 2 activation is RUNTIME via WebUI.
+// Zone 1 = always active. Zone 2 = enabled via equipment.active_zones setting.
 
 // ── Zone 1 InputBindings ──
 static constexpr modesp::InputBinding z1_thermo_inputs[] = {
@@ -141,8 +141,9 @@ static constexpr modesp::InputBinding z1_eev_inputs[] = {
     {"defrost.active",         "defrost_z1.active"},
 };
 
-// ── Zone 2 InputBindings ──
+// ── Zone 2 InputBindings (includes zone_enabled check) ──
 static constexpr modesp::InputBinding z2_thermo_inputs[] = {
+    {"equipment.zone_enabled", "equipment.zone2_enabled"},  // runtime enable
     {"equipment.air_temp",     "equipment.air_temp"},
     {"equipment.evap_temp",    "equipment.evap_temp_z2"},
     {"equipment.sensor1_ok",   "equipment.sensor1_ok"},
@@ -153,6 +154,7 @@ static constexpr modesp::InputBinding z2_thermo_inputs[] = {
     {"protection.lockout",     "protection.lockout"},
 };
 static constexpr modesp::InputBinding z2_defrost_inputs[] = {
+    {"equipment.zone_enabled", "equipment.zone2_enabled"},
     {"equipment.compressor",   "equipment.compressor"},
     {"equipment.evap_temp",    "equipment.evap_temp_z2"},
     {"equipment.has_defrost_relay", "equipment.has_defrost_relay_z2"},
@@ -160,6 +162,7 @@ static constexpr modesp::InputBinding z2_defrost_inputs[] = {
     {"protection.compressor_blocked", "protection.compressor_blocked"},
 };
 static constexpr modesp::InputBinding z2_eev_inputs[] = {
+    {"equipment.zone_enabled", "equipment.zone2_enabled"},
     {"equipment.compressor",   "equipment.compressor"},
     {"equipment.evap_temp",    "equipment.evap_temp_z2"},
     {"equipment.suction_bar",  "equipment.suction_bar_z2"},
@@ -168,18 +171,15 @@ static constexpr modesp::InputBinding z2_eev_inputs[] = {
     {"defrost.active",         "defrost_z2.active"},
 };
 
+// Zone 1 — always active
 static ThermostatModule thermostat_z1("thermo_z1", z1_thermo_inputs);
-static ThermostatModule thermostat_z2("thermo_z2", z2_thermo_inputs);
 static DefrostModule    defrost_z1("defrost_z1", z1_defrost_inputs);
-static DefrostModule    defrost_z2("defrost_z2", z2_defrost_inputs);
 static EevModule        eev_z1("eev_z1", z1_eev_inputs);
-static EevModule        eev_z2("eev_z2", z2_eev_inputs);
 
-#else  // Single zone (default, backward compatible)
-static ThermostatModule        thermostat;
-static DefrostModule           defrost;
-static EevModule               eev;
-#endif
+// Zone 2 — runtime activation via equipment.active_zones
+static ThermostatModule thermostat_z2("thermo_z2", z2_thermo_inputs);
+static DefrostModule    defrost_z2("defrost_z2", z2_defrost_inputs);
+static EevModule        eev_z2("eev_z2", z2_eev_inputs);
 
 // Lighting (NORMAL priority — chamber light control, always single)
 static LightingModule          lighting;
@@ -306,20 +306,15 @@ extern "C" void app_main(void)
     // Protection — моніторинг аварій (HIGH priority, перед thermostat)
     app.modules().register_module(protection);
 
-    // Thermostat + Defrost + EEV — per-zone or single
-#if CONFIG_MODESP_ZONE_COUNT >= 2
-    equipment.set_zone_count(CONFIG_MODESP_ZONE_COUNT);
+    // Thermostat + Defrost + EEV — always 2 zones compiled in.
+    // Zone 2 activation is runtime via equipment.active_zones (WebUI toggle).
+    // Equipment reads active_zones from NVS at init and sets zone_count.
     app.modules().register_module(thermostat_z1);
-    app.modules().register_module(thermostat_z2);
     app.modules().register_module(defrost_z1);
-    app.modules().register_module(defrost_z2);
     app.modules().register_module(eev_z1);
+    app.modules().register_module(thermostat_z2);
+    app.modules().register_module(defrost_z2);
     app.modules().register_module(eev_z2);
-#else
-    app.modules().register_module(thermostat);
-    app.modules().register_module(defrost);
-    app.modules().register_module(eev);
-#endif
 
     // Lighting — освітлення камери (NORMAL priority)
     app.modules().register_module(lighting);
