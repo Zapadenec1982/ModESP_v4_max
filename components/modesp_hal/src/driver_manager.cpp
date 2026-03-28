@@ -22,6 +22,7 @@
 #include "pressure_adc_driver.h"
 #include "eev_analog_driver.h"
 #include "eev_stepper_driver.h"
+#include "eev_pcf8574_stepper_driver.h"
 #include "akv_pulse_driver.h"
 #include "pcf8574_relay_driver.h"
 #include "pcf8574_input_driver.h"
@@ -63,6 +64,9 @@ static size_t eev_analog_count = 0;
 
 static EevStepperDriver eev_stepper_pool[MAX_VALVES];
 static size_t eev_stepper_count = 0;
+
+static modesp::EevPcf8574StepperDriver eev_pcf_pool[MAX_VALVES];
+static size_t eev_pcf_count = 0;
 
 static AkvPulseDriver akv_pool[MAX_VALVES];
 static size_t akv_count = 0;
@@ -132,6 +136,8 @@ bool DriverManager::init(const BindingTable& bindings, HAL& hal) {
             ok = add_actuator(create_pcf_actuator(binding, hal), binding);
         } else if (binding.driver_type == "pcf8574_input") {
             ok = add_sensor(create_pcf_sensor(binding, hal), binding);
+        } else if (binding.driver_type == "eev_pcf8574_stepper") {
+            ok = add_actuator(create_eev_pcf_stepper(binding, hal), binding);
         } else {
             ESP_LOGW(TAG, "  Unknown driver type '%s' for binding '%s'",
                      binding.driver_type.c_str(),
@@ -312,6 +318,46 @@ IActuatorDriver* DriverManager::create_pcf_actuator(const Binding& binding, HAL&
 
     auto& drv = pcf_relay_pool[pcf_relay_count++];
     drv.configure(binding.role.c_str(), expander, out_cfg->pin, out_cfg->active_high);
+    return &drv;
+}
+
+IActuatorDriver* DriverManager::create_eev_pcf_stepper(const Binding& binding, HAL& hal) {
+    if (eev_pcf_count >= MAX_VALVES) {
+        ESP_LOGE(TAG, "EEV PCF8574 stepper pool exhausted");
+        return nullptr;
+    }
+
+    // Binding format: hardware_id = "din_1" (STEP pin position)
+    // Extra fields: dir_hardware = "din_2", max_steps = 480
+    auto* step_cfg = hal.find_expander_input(
+        etl::string_view(binding.hardware_id.c_str(), binding.hardware_id.size()));
+    if (!step_cfg) {
+        ESP_LOGE(TAG, "STEP input '%s' not found", binding.hardware_id.c_str());
+        return nullptr;
+    }
+
+    // DIR pin: use next DIN (step_pin + 1) by convention
+    uint8_t step_pin = step_cfg->pin;
+    uint8_t dir_pin = step_pin + 1;
+
+    // Find expander resource
+    auto* expander = hal.find_i2c_expander(
+        etl::string_view(step_cfg->expander_id.c_str(), step_cfg->expander_id.size()));
+    if (!expander) {
+        ESP_LOGE(TAG, "Expander '%s' not found", step_cfg->expander_id.c_str());
+        return nullptr;
+    }
+
+    // Default 480 for E2V. TODO: configurable via binding options or SharedState
+    uint16_t max_steps = 480;
+
+    auto& drv = eev_pcf_pool[eev_pcf_count++];
+    drv.configure(binding.role.c_str(), expander, step_pin, dir_pin,
+                  max_steps, "eev_pos");
+
+    ESP_LOGI(TAG, "  EEV PCF8574 stepper '%s' STEP=pin%d DIR=pin%d max=%u on '%s'",
+             binding.role.c_str(), step_pin, dir_pin, max_steps,
+             expander->id.c_str());
     return &drv;
 }
 
