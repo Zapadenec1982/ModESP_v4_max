@@ -98,27 +98,55 @@ private:
     bool  ema_evap_init_ = false;
     bool  ema_cond_init_ = false;
 
-    // Requests від бізнес-модулів (читаються кожен цикл з SharedState)
-    struct Requests {
-        // Thermostat
+    // ── Block I: Zone coordination ──
+    static constexpr size_t MAX_ZONES = 4;
+
+    struct ZoneState {
+        // Thermostat requests (from zone's thermostat module)
         bool therm_compressor = false;
         bool therm_evap_fan   = false;
         bool therm_cond_fan   = false;
 
-        // Defrost
+        // Defrost requests (from zone's defrost module)
         bool defrost_active    = false;
         bool def_compressor    = false;
         bool def_defrost_relay = false;
         bool def_evap_fan      = false;
         bool def_cond_fan      = false;
 
-        // Protection
+        // EEV valve position (from zone's eev module)
+        float eev_valve_pos    = 0.0f;
+
+        // Zone namespace prefixes (empty = default single-zone)
+        const char* thermo_ns  = "thermostat";
+        const char* defrost_ns = "defrost";
+        const char* eev_ns     = "eev";
+    };
+
+    ZoneState zones_[MAX_ZONES];
+    size_t    zone_count_ = 1;  // Default: single zone
+
+    void read_zone_requests();
+
+    // Aggregated requests (OR across all zones)
+    struct Requests {
+        // Aggregated from zones
+        bool any_therm_compressor = false;
+        bool any_therm_evap_fan   = false;
+        bool any_therm_cond_fan   = false;
+        bool any_defrost_active   = false;
+        bool any_def_compressor   = false;
+        bool any_def_defrost_relay = false;
+        bool any_def_evap_fan     = false;
+        bool any_def_cond_fan     = false;
+
+        // Protection (shared, not per-zone)
         bool protection_lockout    = false;
         bool compressor_blocked    = false;
         bool condenser_blocked     = false;
         bool door_comp_blocked     = false;
 
-        // Lighting (незалежний від refrigeration arbitration)
+        // Lighting (independent)
         bool light_request         = false;
     } req_;
 

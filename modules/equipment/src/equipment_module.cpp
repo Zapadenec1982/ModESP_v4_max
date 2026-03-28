@@ -256,26 +256,69 @@ void EquipmentModule::read_sensors() {
 // ═══════════════════════════════════════════════════════════════
 
 void EquipmentModule::read_requests() {
-    // Thermostat requests
-    req_.therm_compressor = read_input_bool("thermostat.req.compressor");
-    req_.therm_evap_fan   = read_input_bool("thermostat.req.evap_fan");
-    req_.therm_cond_fan   = read_input_bool("thermostat.req.cond_fan");
+    // Block I: Read requests from all zones (OR aggregation)
+    read_zone_requests();
 
-    // Defrost requests
-    req_.defrost_active    = read_input_bool("defrost.active");
-    req_.def_compressor    = read_input_bool("defrost.req.compressor");
-    req_.def_defrost_relay = read_input_bool("defrost.req.defrost_relay");
-    req_.def_evap_fan      = read_input_bool("defrost.req.evap_fan");
-    req_.def_cond_fan      = read_input_bool("defrost.req.cond_fan");
-
-    // Protection
+    // Protection (shared across all zones)
     req_.protection_lockout  = read_input_bool("protection.lockout");
     req_.compressor_blocked  = read_input_bool("protection.compressor_blocked");
     req_.condenser_blocked   = read_input_bool("protection.condenser_block");
     req_.door_comp_blocked   = read_input_bool("protection.door_comp_blocked");
 
-    // Lighting (незалежний від refrigeration)
+    // Lighting (independent)
     req_.light_request = read_input_bool("lighting.req.light");
+}
+
+void EquipmentModule::read_zone_requests() {
+    // Reset aggregated requests
+    req_.any_therm_compressor = false;
+    req_.any_therm_evap_fan   = false;
+    req_.any_therm_cond_fan   = false;
+    req_.any_defrost_active   = false;
+    req_.any_def_compressor   = false;
+    req_.any_def_defrost_relay = false;
+    req_.any_def_evap_fan     = false;
+    req_.any_def_cond_fan     = false;
+
+    // Read from each zone and OR together
+    char key_buf[64];
+    for (size_t z = 0; z < zone_count_; ++z) {
+        auto& zone = zones_[z];
+
+        // Thermostat requests (via zone namespace)
+        auto make_key = [&key_buf](const char* ns, const char* suffix) -> const char* {
+            char* p = key_buf;
+            const char* s = ns;
+            while (*s) *p++ = *s++;
+            *p++ = '.';
+            s = suffix;
+            while (*s) *p++ = *s++;
+            *p = '\0';
+            return key_buf;
+        };
+
+        zone.therm_compressor = read_bool(make_key(zone.thermo_ns, "req.compressor"));
+        zone.therm_evap_fan   = read_bool(make_key(zone.thermo_ns, "req.evap_fan"));
+        zone.therm_cond_fan   = read_bool(make_key(zone.thermo_ns, "req.cond_fan"));
+
+        zone.defrost_active    = read_bool(make_key(zone.defrost_ns, "active"));
+        zone.def_compressor    = read_bool(make_key(zone.defrost_ns, "req.compressor"));
+        zone.def_defrost_relay = read_bool(make_key(zone.defrost_ns, "req.defrost_relay"));
+        zone.def_evap_fan      = read_bool(make_key(zone.defrost_ns, "req.evap_fan"));
+        zone.def_cond_fan      = read_bool(make_key(zone.defrost_ns, "req.cond_fan"));
+
+        zone.eev_valve_pos     = read_float(make_key(zone.eev_ns, "req.valve_pos"));
+
+        // OR aggregation
+        req_.any_therm_compressor |= zone.therm_compressor;
+        req_.any_therm_evap_fan   |= zone.therm_evap_fan;
+        req_.any_therm_cond_fan   |= zone.therm_cond_fan;
+        req_.any_defrost_active   |= zone.defrost_active;
+        req_.any_def_compressor   |= zone.def_compressor;
+        req_.any_def_defrost_relay |= zone.def_defrost_relay;
+        req_.any_def_evap_fan     |= zone.def_evap_fan;
+        req_.any_def_cond_fan     |= zone.def_cond_fan;
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -289,12 +332,12 @@ void EquipmentModule::apply_arbitration() {
         return;
     }
 
-    // Defrost active = defrost requests мають пріоритет
-    if (req_.defrost_active) {
-        out_.compressor    = req_.def_compressor;
-        out_.defrost_relay = req_.def_defrost_relay;
-        out_.evap_fan      = req_.def_evap_fan;
-        out_.cond_fan      = req_.def_cond_fan;
+    // Defrost active = defrost requests мають пріоритет (any zone)
+    if (req_.any_defrost_active) {
+        out_.compressor    = req_.any_def_compressor;
+        out_.defrost_relay = req_.any_def_defrost_relay;
+        out_.evap_fan      = req_.any_def_evap_fan;
+        out_.cond_fan      = req_.any_def_cond_fan;
         // Логуємо тільки при вході в defrost (не кожен цикл)
         if (!prev_defrost_active_) {
             ESP_LOGI(TAG, "DEFROST arb START: comp=%d relay=%d efan=%d cfan=%d",
@@ -305,11 +348,11 @@ void EquipmentModule::apply_arbitration() {
         if (prev_defrost_active_) {
             ESP_LOGI(TAG, "DEFROST arb END — normal mode restored");
         }
-        // Нормальний режим: thermostat requests
-        out_.compressor    = req_.therm_compressor;
+        // Нормальний режим: thermostat requests (OR across all zones)
+        out_.compressor    = req_.any_therm_compressor;
         out_.defrost_relay = false;   // Тільки defrost може ввімкнути
-        out_.evap_fan      = req_.therm_evap_fan;
-        out_.cond_fan      = req_.therm_cond_fan;
+        out_.evap_fan      = req_.any_therm_evap_fan;
+        out_.cond_fan      = req_.any_therm_cond_fan;
     }
 
     // === AUDIT-003: Compressor anti-short-cycle (output-level) ===
@@ -357,7 +400,7 @@ void EquipmentModule::apply_arbitration() {
     }
 
     // Оновлюємо tracking для delta-логування
-    prev_defrost_active_ = req_.defrost_active;
+    prev_defrost_active_ = req_.any_defrost_active;
 
     // === Block H: Valve safety — close valve when compressor OFF ===
     // Відкритий клапан при зупиненому компресорі → рідкий фреон →
