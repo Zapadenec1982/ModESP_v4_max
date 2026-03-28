@@ -54,6 +54,10 @@ void DefrostModule::sync_settings() {
 
     // Секунди → мілісекунди
     valve_delay_ms_ = static_cast<uint32_t>(read_int(ns_key("valve_delay"), 3)) * 1000;
+
+    // Early termination (MPXPRO dEP/dET)
+    early_term_enabled_ = read_bool(ns_key("early_term_enabled"), false);
+    early_term_temp_    = read_float(ns_key("early_term_temp"), 12.0f);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -413,6 +417,21 @@ void DefrostModule::update_active_phase(uint32_t dt_ms) {
             state_set(ns_key("heater_alarm"), false);
             state_set(ns_key("last_termination"), "temp");
             finish_active_phase("temp reached");
+            return;
+        }
+    }
+
+    // Early termination: дострокове завершення якщо T камери > порогу (MPXPRO dEP/dET)
+    if (early_term_enabled_ && phase_timer_ms_ >= MIN_ACTIVE_CHECK_MS) {
+        float cabinet_temp = read_input_float("equipment.air_temp");
+        bool  sensor1_ok   = read_input_bool("equipment.sensor1_ok");
+        if (sensor1_ok && cabinet_temp > early_term_temp_) {
+            early_term_count_++;
+            state_set(ns_key("early_term_count"), early_term_count_);
+            ESP_LOGW(TAG, "Early defrost termination — cabinet %.1f°C > limit %.1f°C",
+                     cabinet_temp, early_term_temp_);
+            state_set(ns_key("last_termination"), "early_cabinet");
+            finish_active_phase("early cabinet temp");
             return;
         }
     }

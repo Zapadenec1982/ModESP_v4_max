@@ -9,6 +9,7 @@ You are working on an industrial ESP32 refrigeration controller (ESP-IDF 5.5, C+
 3. **Never commit secrets:** No passwords, API keys, tokens, or certificates in code
 4. **Only Equipment touches HAL:** Business modules write requests to SharedState, Equipment arbitrates relay outputs
 5. **State keys:** `module.key` format with min/max/step for readwrite floats/ints
+6. **i18n:** 4 languages (UK/EN/DE/PL) — per-module `i18n/{lang}.json`, lazy-load packs
 
 ## Style
 

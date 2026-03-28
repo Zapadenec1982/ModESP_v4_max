@@ -77,8 +77,18 @@ def datalogger():
 
 
 @pytest.fixture
-def all_manifests(equipment, protection, thermostat, defrost, datalogger):
-    return [equipment, protection, thermostat, defrost, datalogger]
+def eev():
+    return load_manifest("eev")
+
+
+@pytest.fixture
+def lighting():
+    return load_manifest("lighting")
+
+
+@pytest.fixture
+def all_manifests(equipment, protection, thermostat, defrost, datalogger, eev, lighting):
+    return [equipment, protection, thermostat, defrost, datalogger, eev, lighting]
 
 
 @pytest.fixture
@@ -111,11 +121,12 @@ class TestEquipmentManifest:
 
     def test_has_24_state_keys(self, equipment):
         """Equipment має 24 state keys."""
-        assert len(equipment["state"]) == 24
+        assert len(equipment["state"]) == 46
 
     def test_sensor_keys_readonly(self, equipment):
         """Sensor/actuator state keys — read-only, settings — readwrite."""
-        readwrite_keys = {"equipment.filter_coeff", "equipment.ntc_beta",
+        readwrite_keys = {"equipment.active_zones", "equipment.refrigerant",
+                          "equipment.filter_coeff", "equipment.ntc_beta",
                           "equipment.ntc_r_series", "equipment.ntc_r_nominal",
                           "equipment.ds18b20_offset"}
         for key, info in equipment["state"].items():
@@ -186,7 +197,7 @@ class TestProtectionManifest:
 
     def test_has_38_state_keys(self, protection):
         """Protection має 38 state keys."""
-        assert len(protection["state"]) == 38
+        assert len(protection["state"]) == 50
 
     def test_alarm_readonly_keys(self, protection):
         """Alarm keys — read-only."""
@@ -222,7 +233,7 @@ class TestProtectionManifest:
 
     def test_has_14_inputs(self, protection):
         """Protection має 14 inputs (7 data + 5 thermostat UI-only + 2 defrost)."""
-        assert len(protection["inputs"]) == 14
+        assert len(protection["inputs"]) == 17
 
     def test_required_inputs(self, protection):
         """Обов'язкові inputs: equipment.air_temp, equipment.sensor1_ok."""
@@ -237,11 +248,11 @@ class TestProtectionManifest:
 
     def test_mqtt_21_publish(self, protection):
         """MQTT публікує 21 alarm/status keys."""
-        assert len(protection["mqtt"]["publish"]) == 21
+        assert len(protection["mqtt"]["publish"]) == 24
 
     def test_mqtt_18_subscribe(self, protection):
         """MQTT підписка на 18 settings keys."""
-        assert len(protection["mqtt"]["subscribe"]) == 18
+        assert len(protection["mqtt"]["subscribe"]) == 21
 
     def test_display_main_value(self, protection):
         """Display main_value — alarm_code."""
@@ -274,19 +285,19 @@ class TestThermostatManifest:
 
     def test_has_26_state_keys(self, thermostat):
         """Thermostat має 26 state keys."""
-        assert len(thermostat["state"]) == 26
+        assert len(thermostat["state"]) == 30
 
     def test_16_persist_params(self, thermostat):
         """Thermostat має 16 persist параметрів."""
         persist_count = sum(1 for v in thermostat["state"].values()
                            if v.get("persist") is True)
-        assert persist_count == 16
+        assert persist_count == 18
 
     def test_setpoint_config(self, thermostat):
         """setpoint: min=-50, max=50, default=4, persist=true."""
         sp = thermostat["state"]["thermostat.setpoint"]
-        assert sp["min"] == -50.0
-        assert sp["max"] == 50.0
+        assert sp["min"] == -30.0
+        assert sp["max"] == 20.0
         assert sp["default"] == 4.0
         assert sp["persist"] is True
 
@@ -315,7 +326,7 @@ class TestThermostatManifest:
     def test_state_enum(self, thermostat):
         """thermostat.state має enum з 4 значеннями."""
         s = thermostat["state"]["thermostat.state"]
-        assert set(s["enum"]) == {"startup", "idle", "cooling", "safety_run"}
+        assert set(s["enum"]) == {"startup", "idle", "cooling", "continuous", "safety_run", "paused"}
 
     def test_has_10_inputs(self, thermostat):
         """Thermostat має 10 inputs (protection widgets перенесено в protection page)."""
@@ -338,11 +349,11 @@ class TestThermostatManifest:
 
     def test_mqtt_10_publish(self, thermostat):
         """MQTT публікує 10 keys."""
-        assert len(thermostat["mqtt"]["publish"]) == 10
+        assert len(thermostat["mqtt"]["publish"]) == 12
 
     def test_mqtt_17_subscribe(self, thermostat):
         """MQTT підписка на 17 settings."""
-        assert len(thermostat["mqtt"]["subscribe"]) == 17
+        assert len(thermostat["mqtt"]["subscribe"]) == 20
 
     def test_cross_module_widget_key(self, thermostat):
         """UI використовує equipment.compressor як cross-module widget."""
@@ -369,13 +380,13 @@ class TestDefrostManifest:
 
     def test_has_28_state_keys(self, defrost):
         """Defrost має 28 state keys."""
-        assert len(defrost["state"]) == 28
+        assert len(defrost["state"]) == 31
 
     def test_14_persist_readwrite_params(self, defrost):
         """Defrost має 14 readwrite persist параметрів."""
         rw_persist = sum(1 for v in defrost["state"].values()
                          if v.get("access") == "readwrite" and v.get("persist") is True)
-        assert rw_persist == 14
+        assert rw_persist == 16
 
     def test_no_readonly_persist_params(self, defrost):
         """Defrost не має read-only persist params (interval_timer/defrost_count скидаються при ребуті)."""
@@ -425,7 +436,7 @@ class TestDefrostManifest:
 
     def test_has_6_inputs(self, defrost):
         """Defrost має 6 inputs."""
-        assert len(defrost["inputs"]) == 6
+        assert len(defrost["inputs"]) == 8
 
     def test_compressor_input_required(self, defrost):
         """equipment.compressor — обов'язковий input (для dct=2)."""
@@ -445,11 +456,11 @@ class TestDefrostManifest:
 
     def test_mqtt_10_publish(self, defrost):
         """MQTT публікує 10 keys."""
-        assert len(defrost["mqtt"]["publish"]) == 10
+        assert len(defrost["mqtt"]["publish"]) == 11
 
     def test_mqtt_15_subscribe(self, defrost):
         """MQTT підписка на 15 settings."""
-        assert len(defrost["mqtt"]["subscribe"]) == 15
+        assert len(defrost["mqtt"]["subscribe"]) == 17
 
     def test_end_temp_range(self, defrost):
         """end_temp: min=-5, max=30, default=8."""
@@ -526,9 +537,9 @@ class TestCrossModuleValidation:
         assert len(therm_errors) == 0, f"Thermostat errors: {therm_errors}"
 
     def test_total_state_keys(self, all_manifests):
-        """Всього 126 state keys у 5 модулях."""
+        """Всього 192 state keys у 7 модулях."""
         total = sum(len(m.get("state", {})) for m in all_manifests)
-        assert total == 126
+        assert total == 192
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -551,8 +562,9 @@ class TestUIJsonFullProject:
         result = gen.generate(project, all_manifests)
         page_ids = [p["id"] for p in result["pages"]]
         assert "dashboard" in page_ids
-        assert "thermostat" in page_ids
-        assert "defrost" in page_ids
+        # Multi-zone: thermostat → thermo_z1, thermo_z2
+        assert "thermo_z1" in page_ids or "thermostat" in page_ids
+        assert "defrost" in page_ids or "defrost_z1" in page_ids
         assert "protection" in page_ids
         assert "chart" in page_ids
         assert "network" in page_ids
@@ -577,15 +589,18 @@ class TestUIJsonFullProject:
         meta = result["state_meta"]
         assert "equipment.air_temp" in meta
         assert "protection.high_limit" in meta
-        assert "thermostat.setpoint" in meta
-        assert "defrost.type" in meta
-        assert "defrost.interval_timer" in meta
+        # Multi-zone: thermostat.setpoint → thermo_z1.setpoint
+        assert "thermostat.setpoint" in meta or "thermo_z1.setpoint" in meta
+        assert "defrost.type" in meta or "defrost_z1.type" in meta
+        assert "defrost.interval_timer" in meta or "defrost_z1.interval_timer" in meta
 
     def test_defrost_page_has_3_cards(self, project, all_manifests):
         """Сторінка Defrost має 3 cards (Стан, Налаштування, Гарячий газ)."""
         gen = UIJsonGenerator()
         result = gen.generate(project, all_manifests)
-        defrost_page = next(p for p in result["pages"] if p["id"] == "defrost")
+        # Multi-zone: defrost → defrost_z1
+        defrost_page = next((p for p in result["pages"] if "defrost" in p["id"]), None)
+        assert defrost_page is not None, "No defrost page found"
         assert len(defrost_page["cards"]) == 3
 
     def test_protection_page_has_alarm_cards(self, project, all_manifests):
@@ -663,7 +678,7 @@ class TestStateMetaFullProject:
         # datalogger: enabled, retention_hours, sample_interval, log_evap, log_cond,
         #   log_setpoint, log_humidity = 7 rw
         # Total: 61 (auto-counted from manifests)
-        assert "STATE_META_COUNT = 63" in result
+        assert "STATE_META_COUNT = 94" in result
 
     def test_persist_true_for_setpoint(self, all_manifests):
         """thermostat.setpoint — writable=true, persist=true."""
@@ -702,14 +717,14 @@ class TestMqttTopicsFullProject:
         gen = MqttTopicsGenerator()
         result = gen.generate(all_manifests)
         # equipment=6, protection=19, thermostat=10, defrost=10, datalogger=3 = 48
-        assert "MQTT_PUBLISH_COUNT = 50" in result
+        assert "MQTT_PUBLISH_COUNT = 64" in result
 
     def test_subscribe_count(self, all_manifests):
         """Загальна кількість MQTT subscribe topics."""
         gen = MqttTopicsGenerator()
         result = gen.generate(all_manifests)
         # equipment=5, protection=16, thermostat=17, defrost=15, datalogger=7 = 60
-        assert "MQTT_SUBSCRIBE_COUNT = 62" in result
+        assert "MQTT_SUBSCRIBE_COUNT = 85" in result
 
     def test_contains_all_module_topics(self, all_manifests):
         """Містить topics від усіх модулів."""

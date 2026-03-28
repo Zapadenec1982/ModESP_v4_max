@@ -39,6 +39,18 @@
       "type": "int",
       "description": "Що показувати на дисплеї під час відтайки",
       "optional": true
+    },
+    "equipment.air_temp": {
+      "source_module": "equipment",
+      "type": "float",
+      "description": "Температура камери (для early defrost termination)",
+      "optional": true
+    },
+    "equipment.sensor1_ok": {
+      "source_module": "equipment",
+      "type": "bool",
+      "description": "Здоров'я датчика повітря",
+      "optional": true
     }
   },
 
@@ -331,6 +343,29 @@
       "default": 2,
       "persist": true,
       "description": "Час вирівнювання тиску (гарячий газ)"
+    },
+    "defrost.early_term_enabled": {
+      "type": "bool",
+      "access": "readwrite",
+      "default": false,
+      "persist": true,
+      "description": "Дострокове завершення відтайки по T камери"
+    },
+    "defrost.early_term_temp": {
+      "type": "float",
+      "unit": "\u00b0C",
+      "access": "readwrite",
+      "min": -10.0,
+      "max": 30.0,
+      "step": 0.5,
+      "default": 12.0,
+      "persist": true,
+      "description": "Макс. T камери під час відтайки"
+    },
+    "defrost.early_term_count": {
+      "type": "int",
+      "access": "read",
+      "description": "Кількість дострокових завершень"
     }
   },
 
@@ -430,6 +465,15 @@
             "widget": "number_input"
           },
           {
+            "key": "defrost.early_term_enabled",
+            "widget": "toggle"
+          },
+          {
+            "key": "defrost.early_term_temp",
+            "widget": "number_input",
+            "visible_when": {"key": "defrost.early_term_enabled", "eq": true}
+          },
+          {
             "key": "thermostat.display_defrost",
             "widget": "select"
           }
@@ -473,7 +517,8 @@
       "defrost.last_termination",
       "defrost.consecutive_timeouts",
       "defrost.req.compressor",
-      "defrost.req.defrost_relay"
+      "defrost.req.defrost_relay",
+      "defrost.early_term_count"
     ],
     "subscribe": [
       "defrost.type",
@@ -490,7 +535,9 @@
       "defrost.stabilize_time",
       "defrost.valve_delay",
       "defrost.equalize_time",
-      "defrost.manual_start"
+      "defrost.manual_start",
+      "defrost.early_term_enabled",
+      "defrost.early_term_temp"
     ]
   },
 

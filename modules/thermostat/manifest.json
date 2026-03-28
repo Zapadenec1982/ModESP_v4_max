@@ -112,6 +112,14 @@
       "requires_roles": [],
       "always_active": true,
       "controls_settings": ["thermostat.display_defrost"]
+    },
+    "continuous_cycle": {
+      "description": "Безперервний цикл (pulldown після завантаження)",
+      "requires_roles": [],
+      "always_active": true,
+      "controls_settings": [
+        "thermostat.cc_duration", "thermostat.cc_alarm_bypass"
+      ]
     }
   },
 
@@ -282,7 +290,7 @@
     "thermostat.state": {
       "type": "string",
       "access": "read",
-      "enum": ["startup", "idle", "cooling", "safety_run", "paused"],
+      "enum": ["startup", "idle", "cooling", "continuous", "safety_run", "paused"],
       "description": "Стан модуля"
     },
     "thermostat.comp_on_time": {
@@ -369,6 +377,40 @@
         {"value": 2, "label": "Показати -d-"}
       ],
       "description": "Що показувати на дисплеї під час відтайки"
+    },
+    "thermostat.continuous_cycle": {
+      "type": "bool",
+      "access": "readwrite",
+      "default": false,
+      "description": "Безперервний цикл (pulldown)"
+    },
+    "thermostat.cc_duration": {
+      "type": "int",
+      "unit": "год",
+      "access": "readwrite",
+      "min": 1,
+      "max": 15,
+      "step": 1,
+      "default": 4,
+      "persist": true,
+      "description": "Тривалість безперервного циклу"
+    },
+    "thermostat.cc_remaining": {
+      "type": "int",
+      "unit": "хв",
+      "access": "read",
+      "description": "Залишок безперервного циклу"
+    },
+    "thermostat.cc_alarm_bypass": {
+      "type": "int",
+      "unit": "хв",
+      "access": "readwrite",
+      "min": 0,
+      "max": 240,
+      "step": 5,
+      "default": 60,
+      "persist": true,
+      "description": "Bypass тривоги низької T після CC"
     }
   },
 
@@ -499,6 +541,35 @@
             "visible_when": {"key": "thermostat.night_mode", "eq": 1}
           }
         ]
+      },
+      {
+        "title": "Безперервний цикл",
+        "icon": "zap",
+        "icon_color": "yellow",
+        "subtitle": "Pulldown після завантаження",
+        "summary_keys": ["thermostat.continuous_cycle", "thermostat.cc_remaining"],
+        "widgets": [
+          {
+            "key": "thermostat.continuous_cycle",
+            "widget": "toggle",
+            "label": "Безперервний цикл"
+          },
+          {
+            "key": "thermostat.cc_remaining",
+            "widget": "value",
+            "label": "Залишок",
+            "format": "duration",
+            "visible_when": {"key": "thermostat.continuous_cycle", "eq": true}
+          },
+          {
+            "key": "thermostat.cc_duration",
+            "widget": "number_input"
+          },
+          {
+            "key": "thermostat.cc_alarm_bypass",
+            "widget": "number_input"
+          }
+        ]
       }
     ]
   },
@@ -514,7 +585,9 @@
       "thermostat.comp_off_time",
       "thermostat.night_active",
       "thermostat.effective_setpoint",
-      "thermostat.display_temp"
+      "thermostat.display_temp",
+      "thermostat.continuous_cycle",
+      "thermostat.cc_remaining"
     ],
     "subscribe": [
       "thermostat.setpoint",
@@ -533,7 +606,10 @@
       "thermostat.night_start",
       "thermostat.night_end",
       "thermostat.night_active",
-      "thermostat.display_defrost"
+      "thermostat.display_defrost",
+      "thermostat.continuous_cycle",
+      "thermostat.cc_duration",
+      "thermostat.cc_alarm_bypass"
     ]
   },
 

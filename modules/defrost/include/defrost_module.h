@@ -111,11 +111,16 @@ private:
     uint32_t valve_delay_ms_   = 3000;      // Phase 2: 3s
     uint32_t equalize_ms_      = 90000;     // Phase 4: 90s
 
+    // Early termination — safety limit на T_cabinet під час defrost (MPXPRO dEP/dET)
+    bool     early_term_enabled_  = false;
+    float    early_term_temp_     = 12.0f;    // °C — макс. допустима T камери під час відтайки
+
     // === Runtime ===
     uint32_t phase_timer_ms_        = 0;
     uint32_t interval_timer_ms_     = 0;      // persist в NVS
     int32_t  defrost_count_         = 0;      // persist в NVS
     int32_t  consecutive_timeouts_  = 0;
+    int32_t  early_term_count_     = 0;       // Кількість дострокових завершень по T камери
     int32_t  active_defrost_type_   = 0;      // Тип defrost кешований при start (BUG-002 fix)
 
     // Кешований стан requests (для delta-update)

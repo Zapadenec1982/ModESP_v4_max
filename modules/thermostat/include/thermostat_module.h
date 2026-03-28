@@ -8,6 +8,7 @@
  *
  * State machine:
  *   STARTUP → IDLE → COOLING → (IDLE)
+ *                  ↘ CONTINUOUS_CYCLE (pulldown, force cool N hours)
  *                  ↘ SAFETY_RUN ↗  (sensor failure → cyclic compressor)
  *
  * Compressor protection:
@@ -64,13 +65,14 @@ public:
 
 private:
     // State machine
-    enum class State { STARTUP, IDLE, COOLING, SAFETY_RUN };
+    enum class State { STARTUP, IDLE, COOLING, CONTINUOUS_CYCLE, SAFETY_RUN };
     State state_ = State::STARTUP;
     void enter_state(State new_state);
     const char* state_name() const;
 
     // Логіка регулювання
     void update_regulation(uint32_t dt_ms);
+    void update_continuous_cycle(uint32_t dt_ms);
     void update_evap_fan();
     void update_cond_fan(uint32_t dt_ms);
     void update_safety_run(uint32_t dt_ms);
@@ -107,6 +109,15 @@ private:
     int32_t  night_end_        = 6;        // година завершення
     bool     night_active_     = false;
     float    effective_sp_     = 4.0f;     // setpoint + night_setback (коли active)
+
+    // === Continuous Cycle (pulldown) ===
+    int32_t  cc_duration_hours_    = 4;       // 1-15 годин
+    int32_t  cc_alarm_bypass_min_  = 60;      // 0-240 хвилин bypass low_temp після CC
+    bool     cc_requested_        = false;    // trigger з SharedState
+    bool     cc_active_           = false;    // runtime flag
+    uint32_t cc_timer_ms_         = 0;        // countdown
+    uint32_t cc_duration_ms_      = 0;        // duration in ms
+    uint32_t cc_bypass_remaining_ms_ = 0;     // bypass timer після CC
 
     // === Display during defrost ===
     int32_t  display_defrost_  = 1;        // 0=real, 1=frozen, 2="-d-"

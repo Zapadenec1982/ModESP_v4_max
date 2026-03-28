@@ -64,6 +64,11 @@ void ThermostatModule::sync_settings() {
 
     // Дисплей під час відтайки
     display_defrost_ = read_int(ns_key("display_defrost"), 1);
+
+    // Continuous Cycle (pulldown)
+    cc_duration_hours_   = read_int(ns_key("cc_duration"), 4);
+    cc_alarm_bypass_min_ = read_int(ns_key("cc_alarm_bypass"), 60);
+    cc_requested_        = read_bool(ns_key("continuous_cycle"), false);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -134,10 +139,11 @@ void ThermostatModule::request_cond_fan(bool on) {
 
 const char* ThermostatModule::state_name() const {
     switch (state_) {
-        case State::STARTUP:    return "startup";
-        case State::IDLE:       return "idle";
-        case State::COOLING:    return "cooling";
-        case State::SAFETY_RUN: return "safety_run";
+        case State::STARTUP:          return "startup";
+        case State::IDLE:             return "idle";
+        case State::COOLING:          return "cooling";
+        case State::CONTINUOUS_CYCLE: return "continuous";
+        case State::SAFETY_RUN:       return "safety_run";
     }
     return "unknown";
 }
@@ -148,8 +154,9 @@ void ThermostatModule::enter_state(State new_state) {
     ESP_LOGI(TAG, "%s → %s", state_name(),
              new_state == State::STARTUP    ? "startup" :
              new_state == State::IDLE       ? "idle" :
-             new_state == State::COOLING    ? "cooling" :
-             new_state == State::SAFETY_RUN ? "safety_run" : "?");
+             new_state == State::COOLING           ? "cooling" :
+             new_state == State::CONTINUOUS_CYCLE ? "continuous" :
+             new_state == State::SAFETY_RUN      ? "safety_run" : "?");
 
     state_ = new_state;
     state_timer_ms_ = 0;
@@ -164,6 +171,14 @@ void ThermostatModule::enter_state(State new_state) {
             break;
         case State::COOLING:
             request_compressor(true);
+            break;
+        case State::CONTINUOUS_CYCLE:
+            cc_active_ = true;
+            cc_timer_ms_ = 0;
+            cc_duration_ms_ = static_cast<uint32_t>(cc_duration_hours_) * 3600000;
+            request_compressor(true);
+            state_set(ns_key("continuous_cycle"), true);
+            ESP_LOGI(TAG, "CONTINUOUS CYCLE — pulldown %ld hours", static_cast<long>(cc_duration_hours_));
             break;
         case State::SAFETY_RUN:
             // Починаємо з ON фази
@@ -325,7 +340,26 @@ void ThermostatModule::on_update(uint32_t dt_ms) {
         ESP_LOGI(TAG, "Lockout cleared — re-entered %s", state_name());
     }
 
-    // 6. State machine
+    // 6. Continuous Cycle trigger (з IDLE або COOLING)
+    if (cc_requested_ && !cc_active_ &&
+        state_ != State::STARTUP && state_ != State::SAFETY_RUN) {
+        enter_state(State::CONTINUOUS_CYCLE);
+    }
+    // CC deactivation trigger
+    if (!cc_requested_ && cc_active_) {
+        cc_active_ = false;
+        state_set(ns_key("continuous_cycle"), false);
+        ESP_LOGI(TAG, "Continuous cycle cancelled by user");
+        enter_state(State::IDLE);
+    }
+
+    // 6a. CC alarm bypass countdown (після завершення CC)
+    if (cc_bypass_remaining_ms_ > 0) {
+        cc_bypass_remaining_ms_ = (dt_ms < cc_bypass_remaining_ms_)
+                                  ? cc_bypass_remaining_ms_ - dt_ms : 0;
+    }
+
+    // 7. State machine
     switch (state_) {
         case State::STARTUP:
             // Чекаємо startup_delay, потім → IDLE
@@ -343,6 +377,10 @@ void ThermostatModule::on_update(uint32_t dt_ms) {
                 break;
             }
             update_regulation(dt_ms);
+            break;
+
+        case State::CONTINUOUS_CYCLE:
+            update_continuous_cycle(dt_ms);
             break;
 
         case State::SAFETY_RUN:
@@ -396,6 +434,39 @@ void ThermostatModule::update_regulation(uint32_t dt_ms) {
                          comp_on_time_ms_, min_on_ms_);
             }
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Continuous Cycle: примусове охолодження N годин (pulldown)
+// ═══════════════════════════════════════════════════════════════
+
+void ThermostatModule::update_continuous_cycle(uint32_t dt_ms) {
+    // Пауза під час дефросту (timer не рахується)
+    if (defrost_active_) return;
+
+    cc_timer_ms_ += dt_ms;
+
+    // Публікуємо remaining (хвилини)
+    uint32_t remaining_ms = (cc_timer_ms_ < cc_duration_ms_)
+                            ? cc_duration_ms_ - cc_timer_ms_ : 0;
+    state_set(ns_key("cc_remaining"), static_cast<int32_t>(remaining_ms / 60000));
+
+    // Компресор ON (Equipment anti-short-cycle handles min_off/min_on)
+    request_compressor(true);
+
+    // Завершення по таймеру
+    if (cc_timer_ms_ >= cc_duration_ms_) {
+        cc_active_ = false;
+        cc_requested_ = false;
+        state_set(ns_key("continuous_cycle"), false);
+        state_set(ns_key("cc_remaining"), static_cast<int32_t>(0));
+        // Запускаємо bypass timer для low_temp alarm
+        cc_bypass_remaining_ms_ = static_cast<uint32_t>(cc_alarm_bypass_min_) * 60000;
+        ESP_LOGI(TAG, "Continuous cycle complete (%ld h), bypass %ld min",
+                 static_cast<long>(cc_duration_hours_),
+                 static_cast<long>(cc_alarm_bypass_min_));
+        enter_state(State::IDLE);
     }
 }
 

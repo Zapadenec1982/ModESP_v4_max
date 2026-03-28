@@ -24,6 +24,7 @@
 | /api/restore | POST | Restore configuration (NVS import) |
 | /api/auth | GET/POST | Auth settings (read / update) |
 | /api/cloud | GET/POST | AWS IoT Core config + cert upload (CONFIG_MODESP_CLOUD_AWS only) |
+| /api/modbus | GET/POST | Modbus RTU config (enable, slave addr, baud, parity) |
 | /api/factory-reset | POST | Factory reset (NVS clear + restart) |
 | /api/restart | POST | ESP restart |
 | /ws | WS | Real-time state broadcast (delta, 1500ms) |
@@ -55,10 +56,12 @@ ModESP_v4/
 │   ├── modesp_hal/            # HAL, DriverManager, driver interfaces
 │   ├── modesp_net/            # WiFiService, HttpService, WsService
 │   ├── modesp_mqtt/           # MqttService
+│   ├── modesp_modbus/         # Modbus RTU slave (284 input + 252 holding registers)
+│   ├── modesp_refrigerant/    # 23 refrigerants, Antoine equation, dew point calc
 │   ├── modesp_json/           # JSON helpers
 │   └── jsmn/                  # Lightweight JSON parser (header-only)
-├── drivers/                   # 6 drivers (ds18b20, ntc, digital_input, relay, pcf8574_relay, pcf8574_input)
-├── modules/                   # 5 modules (equipment, protection, thermostat, defrost, datalogger)
+├── drivers/                   # 9+ drivers (ds18b20, ntc, pressure_adc, digital_input, pcf8574_input, relay, pcf8574_relay, eev_stepper, eev_pcf8574_stepper, eev_analog, akv_pulse)
+├── modules/                   # 7 modules (equipment, thermostat, defrost, protection, eev, lighting, datalogger)
 ├── tools/
 │   ├── generate_ui.py         # Manifest → UI + C++ headers (~1677 lines)
 │   └── tests/                 # 310 pytest tests
@@ -72,7 +75,7 @@ ModESP_v4/
 ├── generated/                 # GENERATED C++ headers (5 files)
 ├── docs/                      # Architecture docs
 ├── project.json               # Active modules list
-└── partitions.csv             # NVS(24K) + app(1.5MB) + data/LittleFS(384K)
+└── partitions.csv             # NVS(32K) + otadata(8K) + ota_0/ota_1(1472K each) + spiffs(960K) <!-- VERIFY: partitions.csv -->
 ```
 
 ## Editable vs Generated
@@ -95,6 +98,6 @@ ModESP_v4/
 ## Build Environment
 
 - ESP-IDF build: `powershell -ExecutionPolicy Bypass -File run_build.ps1`
-- Host tests: needs `C:/msys64/ucrt64/bin` in PATH for DLLs
+- Host tests: needs `C:/msys64/ucrt64/bin` in PATH for DLLs <!-- VERIFY: path may differ per machine -->
 - WebUI build: `cd webui && npm run build && npm run deploy`
 - Generator: `python tools/generate_ui.py` (auto-runs at CMake build)

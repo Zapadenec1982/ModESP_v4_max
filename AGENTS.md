@@ -18,13 +18,16 @@ cd tools && python -m pytest tests/ -v          # pytest
 
 # Generator (auto-runs at build)
 python tools/generate_ui.py
+
+# Rollback .rules/ (if agent degradation)
+git checkout HEAD~1 -- .rules/
 ```
 
 ## Stack
 
 - **Firmware:** ESP-IDF 5.5 / C++17 / ETL (Embedded Template Library)
 - **Hardware:** ESP32-WROOM-32, 4MB flash, KC868-A6 board
-- **WebUI:** Svelte 4 / Rollup / Dark theme / UA+EN i18n
+- **WebUI:** Svelte 4 / Rollup / Dark theme / 4 languages (UK/EN/DE/PL)
 - **Tests:** doctest (C++ host), pytest (Python)
 - **Tools:** Python 3 (generator, validators)
 
@@ -38,7 +41,18 @@ python tools/generate_ui.py
 
 ## Code Style
 
-- **Zero heap in hot path:** ETL containers only (etl::string, etl::vector), no std::string/new/malloc
+```cpp
+// ✅
+etl::string<32> key = "thermostat.setpoint";
+state_->set(key, value);
+ESP_LOGI(TAG, "Setpoint: %.1f", sp);
+
+// ❌
+std::string key = "thermostat." + name;  // heap!
+printf("Setpoint: %.1f\n", sp);          // no TAG
+```
+
+- **Zero heap in hot path:** ETL containers only, no std::string/new/malloc
 - **Logging:** `ESP_LOGI/W/E/D(TAG, ...)` with `static const char* TAG`
 - **State keys:** `module.key` format (e.g., `thermostat.temperature`)
 - **Comments:** Ukrainian; Doxygen headers in English
