@@ -74,6 +74,12 @@ void ProtectionModule::sync_settings() {
     condenser_alarm_limit_ = read_float(ns_key("condenser_alarm_limit"), 80.0f);
     condenser_block_limit_ = read_float(ns_key("condenser_block_limit"), 85.0f);
 
+    // Pressure protection (Block G)
+    hp_limit_ = read_float(ns_key("hp_limit"), hp_limit_);
+    lp_limit_ = read_float(ns_key("lp_limit"), lp_limit_);
+    hp_alarm_delay_ms_ = static_cast<uint32_t>(read_int(ns_key("hp_alarm_delay"), 10)) * 1000;
+    lp_alarm_delay_ms_ = static_cast<uint32_t>(read_int(ns_key("lp_alarm_delay"), 30)) * 1000;
+
     // Door → compressor delay (like Danfoss C04, seconds)
     door_comp_delay_ms_ = static_cast<uint32_t>(
         read_int(ns_key("door_comp_delay"), 900)) * 1000;
@@ -224,6 +230,18 @@ void ProtectionModule::on_update(uint32_t dt_ms) {
     if (read_input_bool("equipment.has_cond_temp")) {
         float cond_temp = read_input_float("equipment.cond_temp");
         update_condenser_alarm(cond_temp, true, dt_ms);
+    }
+
+    // 6b. Pressure protection (Block G — HP/LP)
+    {
+        bool has_p = read_input_bool("equipment.has_suction_p");
+        if (has_p) {
+            float suction = read_input_float("equipment.suction_bar");
+            float discharge = read_input_float("equipment.discharge_bar");
+            bool comp_on = read_input_bool("equipment.compressor");
+            update_hp_alarm(suction, discharge, true, dt_ms);
+            update_lp_alarm(suction, true, comp_on, dt_ms);
+        }
     }
 
     // 7. Компресорний захист
@@ -785,6 +803,8 @@ void ProtectionModule::publish_alarms() {
     state_set(ns_key("rate_alarm"), rate_rise_.active);
     state_set(ns_key("condenser_alarm"), condenser_.active);
     state_set(ns_key("condenser_block"), condenser_block_.active);
+    state_set(ns_key("hp_alarm"), hp_alarm_.active);
+    state_set(ns_key("lp_alarm"), lp_alarm_.active);
 
     // Зведений статус (включає ескалацію)
     bool any_alarm = high_temp_.active || low_temp_.active ||
@@ -792,6 +812,7 @@ void ProtectionModule::publish_alarms() {
                      short_cycle_.active || rapid_cycle_.active ||
                      continuous_run_.active || pulldown_.active || rate_rise_.active ||
                      condenser_.active || condenser_block_.active ||
+                     hp_alarm_.active || lp_alarm_.active ||
                      permanent_lockout_ || forced_off_active_;
     state_set(ns_key("alarm_active"), any_alarm);
 
@@ -869,6 +890,79 @@ void ProtectionModule::update_condenser_alarm(float cond_temp, bool has_cond,
     }
     // Block requires manual reset — never auto-clears
     // (like Danfoss A80: reset by r12 OFF→ON or power cycle)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Block G: Pressure protection monitors
+// ═══════════════════════════════════════════════════════════════
+
+void ProtectionModule::update_hp_alarm(float suction_bar, float discharge_bar,
+                                       bool has_pressure, uint32_t dt_ms) {
+    if (!has_pressure) {
+        hp_alarm_.active = false;
+        hp_alarm_.pending = false;
+        return;
+    }
+
+    // Use discharge pressure if available, otherwise suction
+    float p = std::isnan(discharge_bar) ? suction_bar : discharge_bar;
+    if (std::isnan(p)) return;
+
+    if (p > hp_limit_) {
+        if (!hp_alarm_.pending) {
+            hp_alarm_.pending = true;
+            hp_alarm_.pending_ms = 0;
+        }
+        hp_alarm_.pending_ms += dt_ms;
+        if (hp_alarm_.pending_ms >= hp_alarm_delay_ms_ && !hp_alarm_.active) {
+            hp_alarm_.active = true;
+            ESP_LOGW(TAG, "HP ALARM — pressure %.1f bar > %.1f bar limit", p, hp_limit_);
+        }
+    } else {
+        hp_alarm_.pending = false;
+        hp_alarm_.pending_ms = 0;
+        if (hp_alarm_.active && !manual_reset_) {
+            hp_alarm_.active = false;
+            ESP_LOGI(TAG, "HP alarm cleared (pressure %.1f bar)", p);
+        }
+    }
+}
+
+void ProtectionModule::update_lp_alarm(float suction_bar, bool has_pressure,
+                                       bool compressor_on, uint32_t dt_ms) {
+    if (!has_pressure) {
+        lp_alarm_.active = false;
+        lp_alarm_.pending = false;
+        return;
+    }
+
+    if (std::isnan(suction_bar)) return;
+
+    // LP only relevant when compressor is running
+    if (!compressor_on) {
+        lp_alarm_.pending = false;
+        lp_alarm_.pending_ms = 0;
+        return;
+    }
+
+    if (suction_bar < lp_limit_) {
+        if (!lp_alarm_.pending) {
+            lp_alarm_.pending = true;
+            lp_alarm_.pending_ms = 0;
+        }
+        lp_alarm_.pending_ms += dt_ms;
+        if (lp_alarm_.pending_ms >= lp_alarm_delay_ms_ && !lp_alarm_.active) {
+            lp_alarm_.active = true;
+            ESP_LOGW(TAG, "LP ALARM — suction %.2f bar < %.2f bar limit", suction_bar, lp_limit_);
+        }
+    } else {
+        lp_alarm_.pending = false;
+        lp_alarm_.pending_ms = 0;
+        if (lp_alarm_.active && !manual_reset_) {
+            lp_alarm_.active = false;
+            ESP_LOGI(TAG, "LP alarm cleared (suction %.2f bar)", suction_bar);
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════

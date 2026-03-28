@@ -177,6 +177,19 @@ private:
     float    condenser_alarm_limit_    = 80.0f;   // °C — alarm threshold
     float    condenser_block_limit_    = 85.0f;   // °C — block threshold (manual reset)
 
+    // ── Pressure protection (Block G) ──
+    AlarmMonitor hp_alarm_;            // High pressure alarm
+    AlarmMonitor lp_alarm_;            // Low pressure alarm
+    float    hp_limit_           = 28.0f;    // bar — HP alarm threshold
+    float    lp_limit_           = -0.5f;    // bar — LP alarm threshold
+    uint32_t hp_alarm_delay_ms_  = 10000;    // 10s — HP response time
+    uint32_t lp_alarm_delay_ms_  = 30000;    // 30s — LP response time
+    bool     hp_block_compressor_ = true;    // HP → block compressor
+    bool     lp_block_compressor_ = true;    // LP → block compressor
+
+    void update_hp_alarm(float suction_bar, float discharge_bar, bool has_pressure, uint32_t dt_ms);
+    void update_lp_alarm(float suction_bar, bool has_pressure, bool compressor_on, uint32_t dt_ms);
+
     // ── Door → compressor delay ──
     uint32_t door_comp_delay_ms_      = 900000;   // 900s = 15 min (Danfoss C04 default)
     bool     door_comp_blocked_       = false;     // compressor blocked by door

@@ -40,6 +40,24 @@
       "description": "Температура випарника (для pulldown, швидший відгук)",
       "optional": true
     },
+    "equipment.suction_bar": {
+      "source_module": "equipment",
+      "type": "float",
+      "description": "Тиск всмоктування (bar)",
+      "optional": true
+    },
+    "equipment.discharge_bar": {
+      "source_module": "equipment",
+      "type": "float",
+      "description": "Тиск нагнітання (bar)",
+      "optional": true
+    },
+    "equipment.has_suction_p": {
+      "source_module": "equipment",
+      "type": "bool",
+      "description": "Датчик тиску всмоктування доступний",
+      "optional": true
+    },
     "defrost.active": {
       "source_module": "defrost",
       "type": "bool",
@@ -445,6 +463,52 @@
       "default": 85,
       "persist": true,
       "description": "Ліміт блокування конденсатора (ручне скидання)"
+    },
+    "protection.hp_alarm": {
+      "type": "bool",
+      "access": "read",
+      "description": "Аварія високого тиску"
+    },
+    "protection.lp_alarm": {
+      "type": "bool",
+      "access": "read",
+      "description": "Аварія низького тиску"
+    },
+    "protection.hp_limit": {
+      "type": "float",
+      "unit": "bar",
+      "access": "readwrite",
+      "min": 5, "max": 45, "step": 0.5,
+      "default": 28,
+      "persist": true,
+      "description": "Ліміт високого тиску"
+    },
+    "protection.lp_limit": {
+      "type": "float",
+      "unit": "bar",
+      "access": "readwrite",
+      "min": -1, "max": 5, "step": 0.1,
+      "default": -0.5,
+      "persist": true,
+      "description": "Ліміт низького тиску"
+    },
+    "protection.hp_alarm_delay": {
+      "type": "int",
+      "unit": "с",
+      "access": "readwrite",
+      "min": 1, "max": 60, "step": 1,
+      "default": 10,
+      "persist": true,
+      "description": "Затримка аварії HP"
+    },
+    "protection.lp_alarm_delay": {
+      "type": "int",
+      "unit": "с",
+      "access": "readwrite",
+      "min": 5, "max": 300, "step": 5,
+      "default": 30,
+      "persist": true,
+      "description": "Затримка аварії LP"
     },
     "protection.door_comp_blocked": {
       "type": "bool",
