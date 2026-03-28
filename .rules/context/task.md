@@ -7,15 +7,16 @@
 
 ## Phase 1 — MPXPRO Parity + Перевершення
 
-### Session 1: Continuous Cycle + Early Defrost Termination
-- [ ] **F1: Continuous Cycle** — 5-й стан FSM, pulldown N годин. Suppress low_temp + continuous_run
-- [ ] **F2: Early Defrost Termination** — safety limit T_cabinet під час defrost
+### Session 1: Continuous Cycle + Early Defrost Termination ✅
+- [x] **F1: Continuous Cycle** — 5-й стан FSM CONTINUOUS_CYCLE, suppress low_temp + continuous_run
+- [x] **F2: Early Defrost Termination** — safety limit T_cabinet, early_term_count counter
+- [x] **Protection suppress** — cc_suppress_active_ з bypass timer
 
-### Session 2: Sensor Redundancy
-- [ ] **F3: Backup Probe + Auto Offset** — air_temp_backup role, EMA-based ro, drift alarm
+### Session 2: Sensor Redundancy ✅
+- [x] **F3: Backup Probe + Auto Offset** — air_temp_backup, EMA ro, drift alarm, failover
 
-### Session 3: Multi-Zone Air
-- [ ] **F4: Multi-Zone** — air_zone_1..4, 4 agg modes (avg/max/min/weighted). Перевершує MPXPRO
+### Session 3: Multi-Zone Air ✅
+- [x] **F4: Multi-Zone** — air_zone_1..4, 4 agg modes, zone_count auto-detect
 
 ## Phase 2 — Smart Defrost
 
