@@ -9,7 +9,9 @@
 
   $: options = config.options || [];
   $: disabled = config.disabled || false;
-  $: current = value !== undefined && value !== null ? value : "";
+  // Force string comparison — HTML select compares values as strings.
+  // value=0 (int) must match option value="0" (string from HTML attribute).
+  $: current = value !== undefined && value !== null ? String(value) : "";
 
   // Runtime: перевірка requires_state через $state
   $: enriched = options.map((opt) => ({
@@ -46,7 +48,7 @@
     >
       {#each enriched as opt}
         <option
-          value={opt.value}
+          value={String(opt.value)}
           disabled={opt.isDisabled}
           title={opt.isDisabled && opt.disabled_hint ? opt.disabled_hint : ""}
         >
