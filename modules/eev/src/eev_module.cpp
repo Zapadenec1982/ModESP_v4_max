@@ -322,10 +322,11 @@ void EevModule::on_update(uint32_t dt_ms) {
                 set_valve_position(position_);
             }
 
-            // Subcooled (SH < 0): emergency close
+            // Subcooled (SH < 0): emergency close at 150Hz (3x normal speed)
             if (superheat_ < 0.0f) {
                 position_ = 0.0f;
                 set_valve_position(0.0f);
+                state_set(ns_key("req.emergency_close"), true);  // Equipment → IValveDriver::emergency_close()
                 ESP_LOGW(TAG, "SUBCOOLED — emergency valve close!");
             }
 

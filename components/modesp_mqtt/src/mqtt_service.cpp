@@ -865,7 +865,7 @@ void MqttService::handle_incoming(const char* topic, int topic_len,
 // ── HTTP API ────────────────────────────────────────────────────
 
 void MqttService::set_cors_headers(httpd_req_t* req) {
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    // AUDIT-039: No wildcard CORS — WebUI is served from same origin
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET,POST,OPTIONS");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
 }
