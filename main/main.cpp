@@ -111,14 +111,78 @@ static EquipmentModule         equipment;
 static ProtectionModule        protection;
 
 // Business modules (NORMAL priority — work through SharedState)
+// Multi-zone: conditional compilation based on Kconfig MODESP_ZONE_COUNT
+#if CONFIG_MODESP_ZONE_COUNT >= 2
+
+// ── Zone 1 InputBindings ──
+static constexpr modesp::InputBinding z1_thermo_inputs[] = {
+    {"equipment.air_temp",     "equipment.air_temp"},      // shared sensor
+    {"equipment.evap_temp",    "equipment.evap_temp_z1"},  // per-zone
+    {"equipment.sensor1_ok",   "equipment.sensor1_ok"},    // shared
+    {"equipment.sensor2_ok",   "equipment.sensor2_z1_ok"}, // per-zone
+    {"equipment.compressor",   "equipment.compressor"},    // shared
+    {"equipment.night_input",  "equipment.night_input"},   // shared
+    {"defrost.active",         "defrost_z1.active"},       // per-zone
+    {"protection.lockout",     "protection.lockout"},      // shared
+};
+static constexpr modesp::InputBinding z1_defrost_inputs[] = {
+    {"equipment.compressor",   "equipment.compressor"},
+    {"equipment.evap_temp",    "equipment.evap_temp_z1"},
+    {"equipment.has_defrost_relay", "equipment.has_defrost_relay_z1"},
+    {"protection.lockout",     "protection.lockout"},
+    {"protection.compressor_blocked", "protection.compressor_blocked"},
+};
+static constexpr modesp::InputBinding z1_eev_inputs[] = {
+    {"equipment.compressor",   "equipment.compressor"},
+    {"equipment.evap_temp",    "equipment.evap_temp_z1"},
+    {"equipment.suction_bar",  "equipment.suction_bar_z1"},
+    {"equipment.has_suction_p","equipment.has_suction_p_z1"},
+    {"equipment.refrigerant",  "equipment.refrigerant"},
+    {"defrost.active",         "defrost_z1.active"},
+};
+
+// ── Zone 2 InputBindings ──
+static constexpr modesp::InputBinding z2_thermo_inputs[] = {
+    {"equipment.air_temp",     "equipment.air_temp"},
+    {"equipment.evap_temp",    "equipment.evap_temp_z2"},
+    {"equipment.sensor1_ok",   "equipment.sensor1_ok"},
+    {"equipment.sensor2_ok",   "equipment.sensor2_z2_ok"},
+    {"equipment.compressor",   "equipment.compressor"},
+    {"equipment.night_input",  "equipment.night_input"},
+    {"defrost.active",         "defrost_z2.active"},
+    {"protection.lockout",     "protection.lockout"},
+};
+static constexpr modesp::InputBinding z2_defrost_inputs[] = {
+    {"equipment.compressor",   "equipment.compressor"},
+    {"equipment.evap_temp",    "equipment.evap_temp_z2"},
+    {"equipment.has_defrost_relay", "equipment.has_defrost_relay_z2"},
+    {"protection.lockout",     "protection.lockout"},
+    {"protection.compressor_blocked", "protection.compressor_blocked"},
+};
+static constexpr modesp::InputBinding z2_eev_inputs[] = {
+    {"equipment.compressor",   "equipment.compressor"},
+    {"equipment.evap_temp",    "equipment.evap_temp_z2"},
+    {"equipment.suction_bar",  "equipment.suction_bar_z2"},
+    {"equipment.has_suction_p","equipment.has_suction_p_z2"},
+    {"equipment.refrigerant",  "equipment.refrigerant"},
+    {"defrost.active",         "defrost_z2.active"},
+};
+
+static ThermostatModule thermostat_z1("thermo_z1", z1_thermo_inputs);
+static ThermostatModule thermostat_z2("thermo_z2", z2_thermo_inputs);
+static DefrostModule    defrost_z1("defrost_z1", z1_defrost_inputs);
+static DefrostModule    defrost_z2("defrost_z2", z2_defrost_inputs);
+static EevModule        eev_z1("eev_z1", z1_eev_inputs);
+static EevModule        eev_z2("eev_z2", z2_eev_inputs);
+
+#else  // Single zone (default, backward compatible)
 static ThermostatModule        thermostat;
 static DefrostModule           defrost;
-
-// Lighting (NORMAL priority — chamber light control)
-static LightingModule          lighting;
-
-// EEV superheat controller (NORMAL priority — after equipment/protection)
 static EevModule               eev;
+#endif
+
+// Lighting (NORMAL priority — chamber light control, always single)
+static LightingModule          lighting;
 
 // DataLogger (LOW priority — logging, runs after business logic)
 static DataLoggerModule        datalogger;
@@ -242,17 +306,23 @@ extern "C" void app_main(void)
     // Protection — моніторинг аварій (HIGH priority, перед thermostat)
     app.modules().register_module(protection);
 
-    // Thermostat — працює через SharedState, без прямого HAL доступу
+    // Thermostat + Defrost + EEV — per-zone or single
+#if CONFIG_MODESP_ZONE_COUNT >= 2
+    equipment.set_zone_count(CONFIG_MODESP_ZONE_COUNT);
+    app.modules().register_module(thermostat_z1);
+    app.modules().register_module(thermostat_z2);
+    app.modules().register_module(defrost_z1);
+    app.modules().register_module(defrost_z2);
+    app.modules().register_module(eev_z1);
+    app.modules().register_module(eev_z2);
+#else
     app.modules().register_module(thermostat);
-
-    // Defrost — цикл розморозки (NORMAL priority, EM арбітрує requests)
     app.modules().register_module(defrost);
-
-    // Lighting — освітлення камери (NORMAL priority, reads thermostat.night_active)
-    app.modules().register_module(lighting);
-
-    // EEV — superheat PI controller (NORMAL priority, reads equipment + defrost)
     app.modules().register_module(eev);
+#endif
+
+    // Lighting — освітлення камери (NORMAL priority)
+    app.modules().register_module(lighting);
 
     // DataLogger — логування температури та подій (LOW priority)
     app.modules().register_module(datalogger);

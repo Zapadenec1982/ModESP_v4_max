@@ -55,6 +55,9 @@ public:
     /// Єдиний модуль з bind_drivers — володіє всіма drivers
     void bind_drivers(modesp::DriverManager& dm);
 
+    /// Set number of zones (called from main.cpp before init)
+    void set_zone_count(size_t count) { zone_count_ = count; }
+
     bool on_init() override;
     void on_update(uint32_t dt_ms) override;
     void on_message(const etl::imessage& msg) override;
