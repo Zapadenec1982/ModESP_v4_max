@@ -65,9 +65,15 @@ public:
 
 private:
     // === Сенсори ===
-    modesp::ISensorDriver* sensor_air_  = nullptr;  // Обов'язковий
-    modesp::ISensorDriver* sensor_evap_ = nullptr;  // Опціональний
-    modesp::ISensorDriver* sensor_cond_ = nullptr;  // Опціональний (DS18B20 або NTC)
+    modesp::ISensorDriver* sensor_air_    = nullptr;  // Обов'язковий
+    modesp::ISensorDriver* sensor_evap_   = nullptr;  // Опціональний
+    modesp::ISensorDriver* sensor_cond_   = nullptr;  // Опціональний (DS18B20 або NTC)
+    modesp::ISensorDriver* sensor_backup_ = nullptr;  // Резервний датчик камери (F3)
+
+    // Multi-zone air sensors (F4)
+    static constexpr size_t MAX_AIR_ZONES = 4;
+    modesp::ISensorDriver* zone_sensors_[MAX_AIR_ZONES] = {};
+    size_t air_zone_count_ = 0;  // Auto-detected від bindings
 
     // === Актуатори ===
     modesp::IActuatorDriver* compressor_    = nullptr;  // Обов'язковий
@@ -100,6 +106,24 @@ private:
     bool  ema_air_init_  = false;
     bool  ema_evap_init_ = false;
     bool  ema_cond_init_ = false;
+
+    // Backup sensor EMA + offset (F3: Sensor Redundancy)
+    float ema_backup_ = 0.0f;
+    bool  ema_backup_init_ = false;
+    float backup_temp_ = 0.0f;
+    float ro_ema_      = 0.0f;   // Auto-calculated probe offset (EMA)
+    bool  ro_ema_init_ = false;
+    bool  failover_active_ = false;
+    bool  sensor_drift_alarm_ = false;
+
+    // Multi-zone EMA (F4)
+    float ema_zone_[MAX_AIR_ZONES] = {};
+    bool  ema_zone_init_[MAX_AIR_ZONES] = {};
+    float zone_temps_[MAX_AIR_ZONES] = {};
+
+    void read_backup_sensor(float alpha);
+    void read_zone_sensors(float alpha);
+    void compute_air_temp();
 
     // ── Block I: Zone coordination ──
     static constexpr size_t MAX_ZONES = 4;

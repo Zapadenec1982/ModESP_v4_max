@@ -121,14 +121,16 @@ class TestEquipmentManifest:
 
     def test_has_24_state_keys(self, equipment):
         """Equipment має 24 state keys."""
-        assert len(equipment["state"]) == 46
+        assert len(equipment["state"]) == 64
 
     def test_sensor_keys_readonly(self, equipment):
         """Sensor/actuator state keys — read-only, settings — readwrite."""
         readwrite_keys = {"equipment.active_zones", "equipment.refrigerant",
                           "equipment.filter_coeff", "equipment.ntc_beta",
                           "equipment.ntc_r_series", "equipment.ntc_r_nominal",
-                          "equipment.ds18b20_offset"}
+                          "equipment.ds18b20_offset",
+                          "equipment.probe_offset_decay", "equipment.sensor_diff_threshold",
+                          "equipment.zone_agg_mode"}
         for key, info in equipment["state"].items():
             if key in readwrite_keys:
                 assert info["access"] == "readwrite", f"{key} не readwrite"
@@ -537,9 +539,9 @@ class TestCrossModuleValidation:
         assert len(therm_errors) == 0, f"Thermostat errors: {therm_errors}"
 
     def test_total_state_keys(self, all_manifests):
-        """Всього 192 state keys у 7 модулях."""
+        """Всього 210 state keys у 7 модулях."""
         total = sum(len(m.get("state", {})) for m in all_manifests)
-        assert total == 192
+        assert total == 210
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -678,7 +680,7 @@ class TestStateMetaFullProject:
         # datalogger: enabled, retention_hours, sample_interval, log_evap, log_cond,
         #   log_setpoint, log_humidity = 7 rw
         # Total: 61 (auto-counted from manifests)
-        assert "STATE_META_COUNT = 94" in result
+        assert "STATE_META_COUNT = 97" in result
 
     def test_persist_true_for_setpoint(self, all_manifests):
         """thermostat.setpoint — writable=true, persist=true."""
@@ -717,14 +719,14 @@ class TestMqttTopicsFullProject:
         gen = MqttTopicsGenerator()
         result = gen.generate(all_manifests)
         # equipment=6, protection=19, thermostat=10, defrost=10, datalogger=3 = 48
-        assert "MQTT_PUBLISH_COUNT = 64" in result
+        assert "MQTT_PUBLISH_COUNT = 74" in result
 
     def test_subscribe_count(self, all_manifests):
         """Загальна кількість MQTT subscribe topics."""
         gen = MqttTopicsGenerator()
         result = gen.generate(all_manifests)
         # equipment=5, protection=16, thermostat=17, defrost=15, datalogger=7 = 60
-        assert "MQTT_SUBSCRIBE_COUNT = 85" in result
+        assert "MQTT_SUBSCRIBE_COUNT = 88" in result
 
     def test_contains_all_module_topics(self, all_manifests):
         """Містить topics від усіх модулів."""

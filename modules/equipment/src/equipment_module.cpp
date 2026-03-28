@@ -52,6 +52,23 @@ void EquipmentModule::bind_drivers(modesp::DriverManager& dm) {
     door_sensor_  = dm.find_sensor("door_contact");
     night_sensor_ = dm.find_sensor("night_input");
 
+    // F3: Backup air sensor (redundancy)
+    sensor_backup_ = dm.find_sensor("air_temp_backup");
+    if (sensor_backup_) {
+        ESP_LOGI(TAG, "Backup air sensor bound — redundancy enabled");
+    }
+
+    // F4: Multi-zone air sensors
+    const char* zone_roles[] = {"air_zone_1", "air_zone_2", "air_zone_3", "air_zone_4"};
+    air_zone_count_ = 0;
+    for (size_t i = 0; i < MAX_AIR_ZONES; i++) {
+        zone_sensors_[i] = dm.find_sensor(zone_roles[i]);
+        if (zone_sensors_[i]) air_zone_count_++;
+    }
+    if (air_zone_count_ > 0) {
+        ESP_LOGI(TAG, "Multi-zone air: %u sensors bound", static_cast<unsigned>(air_zone_count_));
+    }
+
     if (!sensor_air_) {
         ESP_LOGE(TAG, "Sensor 'air_temp' not found — REQUIRED");
     }
@@ -149,6 +166,16 @@ bool EquipmentModule::on_init() {
     state_set(ns_key("has_night_input"), night_sensor_ != nullptr);
     state_set(ns_key("light"), false);
     state_set(ns_key("has_light"), light_ != nullptr);
+
+    // F3: Backup sensor availability
+    state_set(ns_key("has_backup_sensor"), sensor_backup_ != nullptr);
+    state_set(ns_key("sensor_backup_ok"), true);
+    state_set(ns_key("probe_failover_active"), false);
+    state_set(ns_key("sensor_drift_alarm"), false);
+    state_set(ns_key("probe_offset"), 0.0f);
+
+    // F4: Multi-zone init
+    state_set(ns_key("zone_count"), static_cast<int32_t>(air_zone_count_));
 
     // Тип драйверів — для visibility карток налаштувань в UI
     // ISensorDriver::type() повертає "ds18b20", "ntc", "digital_input" тощо
@@ -347,6 +374,169 @@ void EquipmentModule::read_sensors() {
             }
         }
     }
+
+    // ── F3: Backup air sensor ──
+    read_backup_sensor(alpha);
+
+    // ── F4: Multi-zone air sensors ──
+    read_zone_sensors(alpha);
+
+    // ── Compute final air_temp (backup failover + zone aggregation) ──
+    compute_air_temp();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// F3: Backup sensor — read + offset + drift detection
+// ═══════════════════════════════════════════════════════════════
+
+void EquipmentModule::read_backup_sensor(float alpha) {
+    if (!sensor_backup_) return;
+
+    state_set(ns_key("has_backup_sensor"), true);
+
+    float temp = 0.0f;
+    if (sensor_backup_->read(temp)) {
+        if (!ema_backup_init_) { ema_backup_ = temp; ema_backup_init_ = true; }
+        else { ema_backup_ += (temp - ema_backup_) * alpha; }
+        backup_temp_ = roundf(ema_backup_ * 100.0f) / 100.0f;
+        state_set(ns_key("air_temp_backup"), backup_temp_);
+    } else if (!sensor_backup_->is_healthy()) {
+        backup_temp_ = NAN;
+        state_set(ns_key("air_temp_backup"), NAN);
+    }
+    state_set(ns_key("sensor_backup_ok"), sensor_backup_->is_healthy());
+
+    // Auto-calculate offset (ro) коли обидва OK
+    bool primary_ok = sensor_air_ && sensor_air_->is_healthy();
+    bool backup_ok  = sensor_backup_->is_healthy();
+    if (primary_ok && backup_ok && !__builtin_isnan(air_temp_) && !__builtin_isnan(backup_temp_)) {
+        float diff = air_temp_ - backup_temp_;
+        float ro_alpha = 0.01f;  // Повільна EMA для offset (~100 sample window)
+        if (!ro_ema_init_) { ro_ema_ = diff; ro_ema_init_ = true; }
+        else { ro_ema_ += (diff - ro_ema_) * ro_alpha; }
+        state_set(ns_key("probe_offset"), roundf(ro_ema_ * 100.0f) / 100.0f);
+
+        // Drift alarm: |primary - backup| > threshold
+        float threshold = read_float(ns_key("sensor_diff_threshold"), 3.0f);
+        bool drift = (diff > threshold) || (diff < -threshold);
+        if (drift != sensor_drift_alarm_) {
+            sensor_drift_alarm_ = drift;
+            state_set(ns_key("sensor_drift_alarm"), drift);
+            if (drift) {
+                ESP_LOGW(TAG, "SENSOR DRIFT: primary-backup = %.1f°C (threshold %.1f°C)",
+                         diff, threshold);
+            } else {
+                ESP_LOGI(TAG, "Sensor drift cleared");
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// F4: Multi-zone air sensors — read + aggregate
+// ═══════════════════════════════════════════════════════════════
+
+void EquipmentModule::read_zone_sensors(float alpha) {
+    if (air_zone_count_ == 0) return;
+
+    char key[48];
+    for (size_t i = 0; i < MAX_AIR_ZONES; i++) {
+        if (!zone_sensors_[i]) continue;
+
+        float temp = 0.0f;
+        if (zone_sensors_[i]->read(temp)) {
+            if (!ema_zone_init_[i]) { ema_zone_[i] = temp; ema_zone_init_[i] = true; }
+            else { ema_zone_[i] += (temp - ema_zone_[i]) * alpha; }
+            zone_temps_[i] = roundf(ema_zone_[i] * 100.0f) / 100.0f;
+        } else if (!zone_sensors_[i]->is_healthy()) {
+            zone_temps_[i] = NAN;
+        }
+
+        snprintf(key, sizeof(key), "equipment.air_zone_%d_temp", static_cast<int>(i + 1));
+        state_set(key, zone_temps_[i]);
+        snprintf(key, sizeof(key), "equipment.air_zone_%d_ok", static_cast<int>(i + 1));
+        state_set(key, zone_sensors_[i]->is_healthy());
+    }
+    state_set(ns_key("zone_count"), static_cast<int32_t>(air_zone_count_));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Compute final air_temp — failover + zone aggregation
+// ═══════════════════════════════════════════════════════════════
+
+void EquipmentModule::compute_air_temp() {
+    bool primary_ok = sensor_air_ && sensor_air_->is_healthy();
+    bool backup_ok  = sensor_backup_ && sensor_backup_->is_healthy();
+
+    // F4: Multi-zone aggregate (overrides primary if zones available)
+    if (air_zone_count_ > 0) {
+        int32_t agg_mode = read_int(ns_key("zone_agg_mode"), 0);
+        float sum = 0.0f;
+        float max_val = -999.0f;
+        float min_val = 999.0f;
+        int   count = 0;
+
+        for (size_t i = 0; i < MAX_AIR_ZONES; i++) {
+            if (zone_sensors_[i] && zone_sensors_[i]->is_healthy() && !__builtin_isnan(zone_temps_[i])) {
+                sum += zone_temps_[i];
+                if (zone_temps_[i] > max_val) max_val = zone_temps_[i];
+                if (zone_temps_[i] < min_val) min_val = zone_temps_[i];
+                count++;
+            }
+        }
+
+        if (count > 0) {
+            switch (agg_mode) {
+                case 0: air_temp_ = roundf((sum / count) * 100.0f) / 100.0f; break;  // average
+                case 1: air_temp_ = max_val; break;  // max (safety)
+                case 2: air_temp_ = min_val; break;  // min
+                default: air_temp_ = roundf((sum / count) * 100.0f) / 100.0f; break; // fallback: average
+            }
+            state_set(ns_key("air_temp"), air_temp_);
+            state_set(ns_key("sensor1_ok"), true);
+            failover_active_ = false;
+            state_set(ns_key("probe_failover_active"), false);
+            return;
+        }
+        // Всі zone sensors failed — fallthrough to primary/backup
+    }
+
+    // F3: Backup failover (коли primary fail)
+    if (!primary_ok && backup_ok && sensor_backup_) {
+        // Failover: використовуємо backup + offset
+        float offset = ro_ema_init_ ? ro_ema_ : 0.0f;
+
+        // Offset decay
+        int decay_min = read_int(ns_key("probe_offset_decay"), 60);
+        if (decay_min > 0 && failover_active_) {
+            // Зменшуємо offset з часом (простий linear decay)
+            // decay_rate = offset / (decay_min * 60000 / update_interval)
+            // Спрощено: offset *= 0.9999 кожен update (~1s interval → ~10min halflife при decay=60)
+            float decay_factor = 1.0f - (1.0f / (static_cast<float>(decay_min) * 60.0f));
+            ro_ema_ *= decay_factor;
+        }
+
+        air_temp_ = backup_temp_ + offset;
+        air_temp_ = roundf(air_temp_ * 100.0f) / 100.0f;
+        state_set(ns_key("air_temp"), air_temp_);
+        state_set(ns_key("sensor1_ok"), true);  // Graceful degradation
+
+        if (!failover_active_) {
+            failover_active_ = true;
+            state_set(ns_key("probe_failover_active"), true);
+            ESP_LOGW(TAG, "PRIMARY SENSOR FAIL — failover to backup (offset=%.2f°C)", offset);
+        }
+        return;
+    }
+
+    // Primary OK — normal operation (вже встановлено в read_sensors())
+    if (primary_ok && failover_active_) {
+        failover_active_ = false;
+        state_set(ns_key("probe_failover_active"), false);
+        ESP_LOGI(TAG, "Primary sensor restored — failover ended");
+    }
+
+    // Обидва fail → sensor1_ok вже false (встановлено в основному read_sensors())
 }
 
 // ═══════════════════════════════════════════════════════════════

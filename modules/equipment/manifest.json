@@ -27,7 +27,13 @@
     {"role": "evap_fan_z1",      "type": "actuator", "driver": ["relay", "pcf8574_relay"],  "label": "Вент. випарника зона 1",     "optional": true},
     {"role": "evap_fan_z2",      "type": "actuator", "driver": ["relay", "pcf8574_relay"],  "label": "Вент. випарника зона 2",     "optional": true},
     {"role": "eev_z1",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "akv_pulse"], "label": "Клапан EEV зона 1", "optional": true},
-    {"role": "eev_z2",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "akv_pulse"], "label": "Клапан EEV зона 2", "optional": true}
+    {"role": "eev_z2",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "akv_pulse"], "label": "Клапан EEV зона 2", "optional": true},
+
+    {"role": "air_temp_backup",  "type": "sensor",   "driver": ["ds18b20", "ntc"], "label": "Резервний датчик камери",  "optional": true},
+    {"role": "air_zone_1",       "type": "sensor",   "driver": ["ds18b20", "ntc"], "label": "Зона вимірювання 1",       "optional": true},
+    {"role": "air_zone_2",       "type": "sensor",   "driver": ["ds18b20", "ntc"], "label": "Зона вимірювання 2",       "optional": true},
+    {"role": "air_zone_3",       "type": "sensor",   "driver": ["ds18b20", "ntc"], "label": "Зона вимірювання 3",       "optional": true},
+    {"role": "air_zone_4",       "type": "sensor",   "driver": ["ds18b20", "ntc"], "label": "Зона вимірювання 4",       "optional": true}
   ],
 
   "state": {
@@ -95,7 +101,39 @@
 
     "equipment.ds18b20_offset":   {"type": "float", "access": "readwrite", "persist": true,
                                    "min": -5.0, "max": 5.0, "step": 0.1, "default": 0.0,
-                                   "unit": "°C", "description": "Корекція показань DS18B20"}
+                                   "unit": "°C", "description": "Корекція показань DS18B20"},
+
+    "equipment.air_temp_backup":       {"type": "float", "access": "read", "unit": "°C", "description": "Температура резервного датчика"},
+    "equipment.sensor_backup_ok":      {"type": "bool",  "access": "read", "description": "Резервний датчик справний"},
+    "equipment.has_backup_sensor":     {"type": "bool",  "access": "read", "description": "Резервний датчик підключений"},
+    "equipment.probe_offset":          {"type": "float", "access": "read", "unit": "°C", "description": "Авто-розрахований offset (ro)"},
+    "equipment.probe_failover_active": {"type": "bool",  "access": "read", "description": "Активний failover на резервний датчик"},
+    "equipment.sensor_drift_alarm":    {"type": "bool",  "access": "read", "description": "Дрейф між датчиками перевищує поріг"},
+    "equipment.probe_offset_decay":    {"type": "int", "access": "readwrite", "persist": true,
+                                        "min": 0, "max": 240, "step": 5, "default": 60,
+                                        "unit": "хв", "description": "Час затухання offset (0=постійний)"},
+    "equipment.sensor_diff_threshold": {"type": "float", "access": "readwrite", "persist": true,
+                                        "min": 0.5, "max": 10.0, "step": 0.5, "default": 3.0,
+                                        "unit": "°C", "description": "Поріг дрейфу між датчиками"},
+
+    "equipment.air_zone_1_temp":  {"type": "float", "access": "read", "unit": "°C", "description": "Температура зони 1"},
+    "equipment.air_zone_2_temp":  {"type": "float", "access": "read", "unit": "°C", "description": "Температура зони 2"},
+    "equipment.air_zone_3_temp":  {"type": "float", "access": "read", "unit": "°C", "description": "Температура зони 3"},
+    "equipment.air_zone_4_temp":  {"type": "float", "access": "read", "unit": "°C", "description": "Температура зони 4"},
+    "equipment.air_zone_1_ok":    {"type": "bool",  "access": "read", "description": "Датчик зони 1 справний"},
+    "equipment.air_zone_2_ok":    {"type": "bool",  "access": "read", "description": "Датчик зони 2 справний"},
+    "equipment.air_zone_3_ok":    {"type": "bool",  "access": "read", "description": "Датчик зони 3 справний"},
+    "equipment.air_zone_4_ok":    {"type": "bool",  "access": "read", "description": "Датчик зони 4 справний"},
+    "equipment.zone_count":       {"type": "int",   "access": "read", "description": "Кількість зон вимірювання (auto)"},
+    "equipment.zone_agg_mode":    {"type": "int",   "access": "readwrite", "persist": true,
+                                   "min": 0, "max": 3, "step": 1, "default": 0,
+                                   "options": [
+                                     {"value": 0, "label": "Середнє"},
+                                     {"value": 1, "label": "Максимум (safety)"},
+                                     {"value": 2, "label": "Мінімум"},
+                                     {"value": 3, "label": "Зважене"}
+                                   ],
+                                   "description": "Режим агрегації зон"}
   },
 
 
@@ -106,14 +144,27 @@
       "equipment.cond_temp",
       "equipment.compressor",
       "equipment.defrost_relay",
-      "equipment.sensor1_ok"
+      "equipment.sensor1_ok",
+      "equipment.air_temp_backup",
+      "equipment.sensor_backup_ok",
+      "equipment.probe_offset",
+      "equipment.probe_failover_active",
+      "equipment.sensor_drift_alarm",
+      "equipment.air_zone_1_temp",
+      "equipment.air_zone_2_temp",
+      "equipment.air_zone_3_temp",
+      "equipment.air_zone_4_temp",
+      "equipment.zone_count"
     ],
     "subscribe": [
       "equipment.ntc_beta",
       "equipment.ntc_r_series",
       "equipment.ntc_r_nominal",
       "equipment.ds18b20_offset",
-      "equipment.filter_coeff"
+      "equipment.filter_coeff",
+      "equipment.probe_offset_decay",
+      "equipment.sensor_diff_threshold",
+      "equipment.zone_agg_mode"
     ]
   },
 
