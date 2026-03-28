@@ -221,10 +221,10 @@ I2C bus + PCF8574 expander підтримка в HAL:
 - [x] Sensor fault → safe position (40%)
 - [x] Pressure sensor (ratiometric) підтримка
 
-**Phase 2 (planned):**
-- [ ] MOP proportional response (замість фіксованого 3%/cycle)
-- [ ] Valve exercise / unblock (periodic cycle для запобігання заклинюванню)
-- [ ] LOP protection (low evaporation pressure, optional)
+**Phase 2 (реалізовано 2026-03-28):**
+- [x] MOP proportional response (1+over*2 %/interval, cap 8%, всередині pi_timer)
+- [x] Valve exercise / unblock (open→close при idle > 24h, конфігурується 0-168h)
+- [ ] LOP protection (low evaporation pressure, optional — P3)
 
 **Оцінка Phase 2:** 1-2 сесії
 

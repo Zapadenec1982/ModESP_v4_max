@@ -17,6 +17,16 @@
   - Stepper: закриття 150Hz замість 50Hz (3.2s vs 9.6s для E2V 480 кроків)
   - Раніше прапорець був dead code — emergency mode ніколи не активувався
 
+- **feat(eev): MOP proportional response:**
+  - Замість фіксованого 3%/10ms (300%/s!) — пропорційно: `1 + over*2` (%/interval), cap 8%
+  - MOP всередині pi_timer (1x/3s) замість кожні 10ms
+  - LowSH пріоритет вище MOP (захист компресора > захист тиску)
+
+- **feat(eev): valve exercise / unblock:**
+  - Новий стан EXERCISE: open→close цикл при idle > 24h (конфігурується 0-168h)
+  - Запобігає заклинюванню крокових клапанів (E2V, ETS) після тривалого простою
+  - Переривається при старті компресора або defrost
+
 - **docs: аналіз CAREL EVD mini (+0300036EN) vs ModESP EEV:**
   - Velocity-form PI (ModESP) vs classic PID (CAREL) — наш кращий (anti-windup)
   - LowSH/MOP захист — реалізовано, subcooled emergency — тільки в ModESP
