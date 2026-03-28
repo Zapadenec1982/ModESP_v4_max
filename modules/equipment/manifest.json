@@ -16,7 +16,18 @@
     {"role": "light",          "type": "actuator", "driver": ["relay", "pcf8574_relay"], "label": "Освітлення камери",    "optional": true},
     {"role": "suction_p",     "type": "sensor",   "driver": ["pressure_adc"],          "label": "Тиск всмоктування",    "optional": true},
     {"role": "discharge_p",   "type": "sensor",   "driver": ["pressure_adc"],          "label": "Тиск нагнітання",      "optional": true},
-    {"role": "eev",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "akv_pulse"], "label": "Клапан EEV", "optional": true}
+    {"role": "eev",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "akv_pulse"], "label": "Клапан EEV", "optional": true},
+
+    {"role": "evap_temp_z1",     "type": "sensor",   "driver": ["ds18b20", "ntc"],          "label": "Темп. випарника зона 1",     "optional": true},
+    {"role": "evap_temp_z2",     "type": "sensor",   "driver": ["ds18b20", "ntc"],          "label": "Темп. випарника зона 2",     "optional": true},
+    {"role": "suction_p_z1",     "type": "sensor",   "driver": ["pressure_adc"],            "label": "Тиск всмоктування зона 1",   "optional": true},
+    {"role": "suction_p_z2",     "type": "sensor",   "driver": ["pressure_adc"],            "label": "Тиск всмоктування зона 2",   "optional": true},
+    {"role": "defrost_relay_z1", "type": "actuator", "driver": ["relay", "pcf8574_relay"],  "label": "Реле відтайки зона 1",       "optional": true},
+    {"role": "defrost_relay_z2", "type": "actuator", "driver": ["relay", "pcf8574_relay"],  "label": "Реле відтайки зона 2",       "optional": true},
+    {"role": "evap_fan_z1",      "type": "actuator", "driver": ["relay", "pcf8574_relay"],  "label": "Вент. випарника зона 1",     "optional": true},
+    {"role": "evap_fan_z2",      "type": "actuator", "driver": ["relay", "pcf8574_relay"],  "label": "Вент. випарника зона 2",     "optional": true},
+    {"role": "eev_z1",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "akv_pulse"], "label": "Клапан EEV зона 1", "optional": true},
+    {"role": "eev_z2",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "akv_pulse"], "label": "Клапан EEV зона 2", "optional": true}
   ],
 
   "state": {
@@ -49,6 +60,17 @@
                                   "min": 0, "max": 22, "step": 1, "default": 0,
                                   "description": "Тип холодоагенту (0=R134a, 1=R404A, ...)"},
     "equipment.has_ds18b20_driver": {"type": "bool", "access": "read", "description": "Використовується DS18B20 драйвер"},
+
+    "equipment.evap_temp_z1":         {"type": "float", "unit": "°C", "access": "read", "description": "Темп. випарника зона 1"},
+    "equipment.evap_temp_z2":         {"type": "float", "unit": "°C", "access": "read", "description": "Темп. випарника зона 2"},
+    "equipment.sensor2_z1_ok":        {"type": "bool", "access": "read", "description": "Датчик випарника зона 1 справний"},
+    "equipment.sensor2_z2_ok":        {"type": "bool", "access": "read", "description": "Датчик випарника зона 2 справний"},
+    "equipment.suction_bar_z1":       {"type": "float", "unit": "bar", "access": "read", "description": "Тиск всмоктування зона 1"},
+    "equipment.suction_bar_z2":       {"type": "float", "unit": "bar", "access": "read", "description": "Тиск всмоктування зона 2"},
+    "equipment.has_suction_p_z1":     {"type": "bool", "access": "read", "description": "Датчик тиску зона 1 доступний"},
+    "equipment.has_suction_p_z2":     {"type": "bool", "access": "read", "description": "Датчик тиску зона 2 доступний"},
+    "equipment.has_defrost_relay_z1": {"type": "bool", "access": "read", "description": "Реле відтайки зона 1 доступне"},
+    "equipment.has_defrost_relay_z2": {"type": "bool", "access": "read", "description": "Реле відтайки зона 2 доступне"},
 
     "equipment.filter_coeff":    {"type": "int", "access": "readwrite", "persist": true,
                                   "min": 0, "max": 10, "step": 1, "default": 4,

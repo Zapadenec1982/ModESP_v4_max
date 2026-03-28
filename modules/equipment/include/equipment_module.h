@@ -120,6 +120,13 @@ private:
         // EEV valve position (from zone's eev module)
         float eev_valve_pos    = 0.0f;
 
+        // Per-zone hardware (bound in bind_drivers, used when zone_count >= 2)
+        modesp::ISensorDriver*   evap_sensor     = nullptr;
+        modesp::ISensorDriver*   pressure_sensor = nullptr;
+        modesp::IActuatorDriver* defrost_relay   = nullptr;
+        modesp::IActuatorDriver* evap_fan        = nullptr;
+        modesp::IActuatorDriver* eev_driver      = nullptr;
+
         // Zone namespace prefixes (empty = default single-zone)
         const char* thermo_ns  = "thermostat";
         const char* defrost_ns = "defrost";

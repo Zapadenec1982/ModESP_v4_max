@@ -72,6 +72,32 @@ void EquipmentModule::bind_drivers(modesp::DriverManager& dm) {
     // Block H: EEV valve driver (optional)
     eev_driver_ = dm.find_actuator("eev");
     if (eev_driver_) ESP_LOGI(TAG, "EEV valve driver bound");
+
+    // Per-zone driver binding (when zone_count_ >= 2)
+    if (zone_count_ >= 2) {
+        zones_[0].evap_sensor     = dm.find_sensor("evap_temp_z1");
+        zones_[0].pressure_sensor = dm.find_sensor("suction_p_z1");
+        zones_[0].defrost_relay   = dm.find_actuator("defrost_relay_z1");
+        zones_[0].evap_fan        = dm.find_actuator("evap_fan_z1");
+        zones_[0].eev_driver      = dm.find_actuator("eev_z1");
+
+        zones_[1].evap_sensor     = dm.find_sensor("evap_temp_z2");
+        zones_[1].pressure_sensor = dm.find_sensor("suction_p_z2");
+        zones_[1].defrost_relay   = dm.find_actuator("defrost_relay_z2");
+        zones_[1].evap_fan        = dm.find_actuator("evap_fan_z2");
+        zones_[1].eev_driver      = dm.find_actuator("eev_z2");
+
+        ESP_LOGI(TAG, "Multi-zone: %d zones configured", (int)zone_count_);
+        for (size_t z = 0; z < zone_count_; z++) {
+            ESP_LOGI(TAG, "  Zone %d: evap=%s press=%s defr=%s efan=%s eev=%s",
+                     (int)(z + 1),
+                     zones_[z].evap_sensor     ? "OK" : "-",
+                     zones_[z].pressure_sensor ? "OK" : "-",
+                     zones_[z].defrost_relay   ? "OK" : "-",
+                     zones_[z].evap_fan        ? "OK" : "-",
+                     zones_[z].eev_driver      ? "OK" : "-");
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -126,6 +152,29 @@ bool EquipmentModule::on_init() {
     check_type(sensor_cond_);
     state_set(ns_key("has_ntc_driver"), uses_ntc);
     state_set(ns_key("has_ds18b20_driver"), uses_ds18b20);
+
+    // Per-zone initial state (when zone_count >= 2)
+    if (zone_count_ >= 2) {
+        for (size_t z = 0; z < zone_count_; z++) {
+            char key[48];
+            int zn = (int)(z + 1);
+
+            snprintf(key, sizeof(key), "equipment.evap_temp_z%d", zn);
+            state_set(key, 0.0f);
+
+            snprintf(key, sizeof(key), "equipment.sensor2_z%d_ok", zn);
+            state_set(key, true);
+
+            snprintf(key, sizeof(key), "equipment.suction_bar_z%d", zn);
+            state_set(key, 0.0f);
+
+            snprintf(key, sizeof(key), "equipment.has_suction_p_z%d", zn);
+            state_set(key, zones_[z].pressure_sensor != nullptr);
+
+            snprintf(key, sizeof(key), "equipment.has_defrost_relay_z%d", zn);
+            state_set(key, zones_[z].defrost_relay != nullptr);
+        }
+    }
 
     ESP_LOGI(TAG, "Initialized (air_sensor=%s, compressor=%s, ntc=%s, ds18b20=%s)",
              sensor_air_ ? "OK" : "MISSING",
@@ -248,6 +297,33 @@ void EquipmentModule::read_sensors() {
         float val = 0.0f;
         night_sensor_->read(val);
         state_set(ns_key("night_input"), val > 0.5f);
+    }
+
+    // Per-zone sensors (when zone_count >= 2)
+    if (zone_count_ >= 2) {
+        for (size_t z = 0; z < zone_count_; z++) {
+            char key[48];
+            int zn = (int)(z + 1);
+            float val = 0.0f;
+
+            // Per-zone evaporator temperature
+            if (zones_[z].evap_sensor) {
+                if (zones_[z].evap_sensor->read(val)) {
+                    snprintf(key, sizeof(key), "equipment.evap_temp_z%d", zn);
+                    state_set(key, roundf(val * 100.0f) / 100.0f);
+                }
+                snprintf(key, sizeof(key), "equipment.sensor2_z%d_ok", zn);
+                state_set(key, zones_[z].evap_sensor->is_healthy());
+            }
+
+            // Per-zone suction pressure
+            if (zones_[z].pressure_sensor) {
+                if (zones_[z].pressure_sensor->read(val)) {
+                    snprintf(key, sizeof(key), "equipment.suction_bar_z%d", zn);
+                    state_set(key, roundf(val * 100.0f) / 100.0f);
+                }
+            }
+        }
     }
 }
 
@@ -383,6 +459,11 @@ void EquipmentModule::apply_arbitration() {
         out_.compressor = false;
     }
 
+    // === Per-zone defrost relay arbitration (zone_count >= 2) ===
+    // Each zone controls its own defrost relay independently.
+    // The shared defrost_relay_ is used only in single-zone mode.
+    // Per-zone evap fans follow zone defrost state when in defrost mode.
+
     // === ІНТЕРЛОКИ (hardcoded, неможливо обійти) ===
     // Виконуються ОСТАННІМИ — мають найвищий пріоритет після protection lockout.
 
@@ -425,12 +506,37 @@ void EquipmentModule::apply_arbitration() {
 
 void EquipmentModule::apply_outputs() {
     if (compressor_)    compressor_->set(out_.compressor);
-    if (defrost_relay_) defrost_relay_->set(out_.defrost_relay);
-    if (evap_fan_)      evap_fan_->set(out_.evap_fan);
     if (cond_fan_)      cond_fan_->set(out_.cond_fan);
     if (light_)         light_->set(out_.light);
 
-    // Block H: EEV valve output — apply to IValveDriver if bound
+    // Per-zone outputs: defrost relay + evap fan per zone
+    if (zone_count_ >= 2) {
+        for (size_t z = 0; z < zone_count_; z++) {
+            if (zones_[z].defrost_relay) {
+                zones_[z].defrost_relay->set(zones_[z].def_defrost_relay);
+            }
+            if (zones_[z].evap_fan) {
+                // During defrost: zone defrost controls fan; otherwise thermostat
+                if (zones_[z].defrost_active) {
+                    zones_[z].evap_fan->set(zones_[z].def_evap_fan);
+                } else {
+                    zones_[z].evap_fan->set(zones_[z].therm_evap_fan);
+                }
+            }
+            // Per-zone EEV valve
+            if (zones_[z].eev_driver && out_.compressor) {
+                zones_[z].eev_driver->set_value(zones_[z].eev_valve_pos / 100.0f);
+            } else if (zones_[z].eev_driver) {
+                zones_[z].eev_driver->set_value(0.0f);  // Close when compressor OFF
+            }
+        }
+    } else {
+        // Single zone: existing behavior
+        if (defrost_relay_) defrost_relay_->set(out_.defrost_relay);
+        if (evap_fan_)      evap_fan_->set(out_.evap_fan);
+    }
+
+    // Block H: EEV valve output — apply to IValveDriver if bound (single-zone)
     if (eev_driver_) {
         eev_driver_->set_value(out_.valve_pos / 100.0f);  // 0-100% → 0.0-1.0
     }
