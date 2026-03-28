@@ -31,7 +31,15 @@ constexpr const char* BUILD_DATE = __DATE__ " " __TIME__;
 // ═══════════════════════════════════════════════════════════════
 
 #ifndef MODESP_MAX_KEY_LENGTH
-#define MODESP_MAX_KEY_LENGTH 32   // Найдовший ключ: protection.max_retries (22 chars)
+#define MODESP_MAX_KEY_LENGTH 32
+// ⚠️ LIMIT: 32 chars max for state key names (including namespace prefix)
+// Найдовші ключі (НА МЕЖІ):
+//   protection.condenser_block_limit  = 32 chars (РІВНО 32!)
+//   protection.condenser_alarm_limit  = 32 chars
+//   defrost_z1.consecutive_timeouts   = 31 chars
+// Нові ключі ПОВИННІ бути ≤ 32 chars. Перевіряй: strlen("ns.key") ≤ 32
+// Збільшення до 48 коштує ~8KB RAM (250 entries × 16B × 2 copies).
+// Краще скорочувати назви: cond_block_lim замість condenser_block_limit.
 #endif
 
 #ifndef MODESP_MAX_STRING_VALUE_LENGTH
