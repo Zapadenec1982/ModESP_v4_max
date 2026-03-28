@@ -791,11 +791,17 @@ class UIJsonGenerator:
         # Module pages (inserted between dashboard and system pages)
         zone_count = get_zone_count(project)
         zone_ns = project.get("zone_namespaces", {})
+        embed_cards = []  # Cards to embed into bindings page
         for m in manifests:
             ui = m.get("ui")
             if not ui:
                 continue
             mod_name = m.get("module", "?")
+            # Modules with page_id="_embed_in_bindings" → merge into bindings page
+            if ui.get("page_id") == "_embed_in_bindings":
+                page = self._module_page(m, ui)
+                embed_cards.extend(page.get("cards", []))
+                continue
             if zone_count > 1 and is_zone_module(project, mod_name):
                 # Multi-zone: create separate page per zone
                 for z in range(zone_count):
@@ -813,9 +819,13 @@ class UIJsonGenerator:
                 if m.get("module") == "equipment":
                     equip_requires = m.get("requires", [])
                     break
-            pages.append(self._bindings_page(
+            bindings_page = self._bindings_page(
                 bindings, board, driver_manifests or {},
-                equip_requires))
+                equip_requires)
+            # Prepend embedded equipment cards before hardware bindings cards
+            if embed_cards:
+                bindings_page["cards"] = embed_cards + bindings_page.get("cards", [])
+            pages.append(bindings_page)
         if sys_pages.get("network", True):
             cloud_provider = sys_cfg.get("cloud_provider", "mqtt")
             pages.append(self._network_page(cloud_provider))

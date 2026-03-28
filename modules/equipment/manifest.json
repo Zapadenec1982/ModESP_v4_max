@@ -119,6 +119,7 @@
 
   "ui": {
     "page": "Обладнання",
+    "page_id": "_embed_in_bindings",
     "icon": "link",
     "cards": [
       {
