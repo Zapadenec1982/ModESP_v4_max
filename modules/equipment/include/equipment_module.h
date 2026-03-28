@@ -72,6 +72,7 @@ private:
     modesp::IActuatorDriver* evap_fan_      = nullptr;  // Опціональний
     modesp::IActuatorDriver* cond_fan_      = nullptr;  // Опціональний
     modesp::IActuatorDriver* light_         = nullptr;  // Опціональний (освітлення камери)
+    modesp::IActuatorDriver* eev_driver_    = nullptr;  // Опціональний (EEV valve, Block H)
 
     // === Дискретні входи ===
     modesp::ISensorDriver* door_sensor_  = nullptr;  // Опціональний
@@ -128,6 +129,7 @@ private:
         bool evap_fan      = false;
         bool cond_fan      = false;
         bool light         = false;    // Незалежний від refrigeration
+        float valve_pos    = 0.0f;     // EEV valve position 0-100% (Block H safety)
     } out_;
 
     // Defrost transition tracking (логуємо тільки при зміні стану)

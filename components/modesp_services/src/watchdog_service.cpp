@@ -97,6 +97,16 @@ void WatchdogService::on_update(uint32_t dt_ms) {
             self->error_service_.report(
                 "watchdog", -200, ErrorSeverity::CRITICAL,
                 "Module exceeded max restarts");
+
+            // Block H: Safe state — if a CRITICAL or HIGH module fails permanently,
+            // force safe state: lockout all actuators via SharedState
+            if (module.priority() == ModulePriority::CRITICAL ||
+                module.priority() == ModulePriority::HIGH) {
+                ESP_LOGE(TAG, "SAFE STATE — critical module '%s' unrecoverable, "
+                         "forcing protection lockout", module.name());
+                // Setting lockout triggers Equipment to shut everything down
+                self->state_set("protection.lockout", true);
+            }
         }
     }, &ctx);
 }

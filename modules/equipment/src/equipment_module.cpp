@@ -68,6 +68,10 @@ void EquipmentModule::bind_drivers(modesp::DriverManager& dm) {
 
     light_ = dm.find_actuator("light");
     if (light_) ESP_LOGI(TAG, "Light relay bound");
+
+    // Block H: EEV valve driver (optional)
+    eev_driver_ = dm.find_actuator("eev");
+    if (eev_driver_) ESP_LOGI(TAG, "EEV valve driver bound");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -169,7 +173,14 @@ void EquipmentModule::on_stop() {
     // Аварійна зупинка — все вимкнути
     out_ = {};
     apply_outputs();
-    ESP_LOGI(TAG, "Equipment stopped — all outputs OFF");
+
+    // Block H: Emergency close EEV valve
+    if (eev_driver_) {
+        eev_driver_->emergency_stop();
+        ESP_LOGW(TAG, "EEV valve emergency close on stop");
+    }
+
+    ESP_LOGI(TAG, "Equipment stopped — all outputs OFF, valve closed");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -348,6 +359,18 @@ void EquipmentModule::apply_arbitration() {
     // Оновлюємо tracking для delta-логування
     prev_defrost_active_ = req_.defrost_active;
 
+    // === Block H: Valve safety — close valve when compressor OFF ===
+    // Відкритий клапан при зупиненому компресорі → рідкий фреон →
+    // гідроудар при наступному старті → поломка компресора.
+    // Клапан ЗАВЖДИ закривається раніше або одночасно з компресором.
+    if (!out_.compressor) {
+        // Compressor OFF → valve must be closed (0%)
+        out_.valve_pos = 0.0f;
+    } else {
+        // Compressor ON → use EEV module request
+        out_.valve_pos = read_input_float("eev.req.valve_pos", 0.0f);
+    }
+
     // === Освітлення — незалежне від refrigeration arbitration ===
     // Не залежить від lockout, defrost, protection
     out_.light = req_.light_request;
@@ -363,6 +386,11 @@ void EquipmentModule::apply_outputs() {
     if (evap_fan_)      evap_fan_->set(out_.evap_fan);
     if (cond_fan_)      cond_fan_->set(out_.cond_fan);
     if (light_)         light_->set(out_.light);
+
+    // Block H: EEV valve output — apply to IValveDriver if bound
+    if (eev_driver_) {
+        eev_driver_->set_value(out_.valve_pos / 100.0f);  // 0-100% → 0.0-1.0
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
