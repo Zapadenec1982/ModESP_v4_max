@@ -1,0 +1,268 @@
+{
+  "manifest_version": 1,
+  "module": "eev",
+  "description": "Electronic Expansion Valve — superheat PI controller",
+
+  "inputs": {
+    "equipment.evap_temp": {
+      "source_module": "equipment",
+      "type": "float",
+      "optional": false,
+      "description": "Evaporator outlet temperature (°C)"
+    },
+    "equipment.compressor": {
+      "source_module": "equipment",
+      "type": "bool",
+      "optional": false,
+      "description": "Actual compressor state"
+    },
+    "equipment.suction_bar": {
+      "source_module": "equipment",
+      "type": "float",
+      "optional": false,
+      "description": "Suction pressure (bar)"
+    },
+    "equipment.has_suction_p": {
+      "source_module": "equipment",
+      "type": "bool",
+      "optional": true,
+      "description": "Suction pressure sensor available"
+    },
+    "equipment.sensor2_ok": {
+      "source_module": "equipment",
+      "type": "bool",
+      "optional": false,
+      "description": "Evaporator sensor health"
+    },
+    "defrost.active": {
+      "source_module": "defrost",
+      "type": "bool",
+      "optional": true,
+      "description": "Defrost active flag"
+    },
+    "equipment.refrigerant": {
+      "source_module": "equipment",
+      "type": "int",
+      "optional": true,
+      "description": "Refrigerant type index (from saturation.h)"
+    }
+  },
+
+  "features": {
+    "superheat_control": {
+      "description": "PI superheat regulation with EEV",
+      "requires_roles": ["eev"],
+      "controls_settings": [
+        "eev.sh_target", "eev.kp", "eev.ki",
+        "eev.startup_pos", "eev.startup_wait",
+        "eev.min_pos", "eev.max_pos", "eev.safe_pos",
+        "eev.low_sh_limit", "eev.mop_pressure", "eev.deadband"
+      ]
+    }
+  },
+
+  "state": {
+    "eev.superheat": {
+      "type": "float",
+      "access": "read",
+      "unit": "K",
+      "description": "Current superheat (T_evap - T_sat)"
+    },
+    "eev.t_sat": {
+      "type": "float",
+      "access": "read",
+      "unit": "°C",
+      "description": "Saturation temperature from suction pressure"
+    },
+    "eev.valve_pos": {
+      "type": "float",
+      "access": "read",
+      "unit": "%",
+      "description": "Current valve position 0-100%"
+    },
+    "eev.state": {
+      "type": "string",
+      "access": "read",
+      "description": "State machine: idle/startup/running/low_sh/defrost/fault"
+    },
+    "eev.pi_output": {
+      "type": "float",
+      "access": "read",
+      "description": "PI controller output (steps/cycle)"
+    },
+    "eev.req.valve_pos": {
+      "type": "float",
+      "access": "read",
+      "unit": "%",
+      "description": "Requested valve position for Equipment"
+    },
+
+    "eev.sh_target": {
+      "type": "float",
+      "access": "readwrite",
+      "min": 2.0, "max": 25.0, "step": 0.5,
+      "default": 8.0,
+      "persist": true,
+      "unit": "K",
+      "description": "Superheat setpoint"
+    },
+    "eev.kp": {
+      "type": "float",
+      "access": "readwrite",
+      "min": 0.1, "max": 20.0, "step": 0.1,
+      "default": 3.0,
+      "persist": true,
+      "description": "PI proportional gain"
+    },
+    "eev.ki": {
+      "type": "float",
+      "access": "readwrite",
+      "min": 0.01, "max": 5.0, "step": 0.01,
+      "default": 0.5,
+      "persist": true,
+      "description": "PI integral gain"
+    },
+    "eev.startup_pos": {
+      "type": "float",
+      "access": "readwrite",
+      "min": 10.0, "max": 80.0, "step": 1.0,
+      "default": 50.0,
+      "persist": true,
+      "unit": "%",
+      "description": "Valve position at compressor startup"
+    },
+    "eev.startup_wait": {
+      "type": "int",
+      "access": "readwrite",
+      "min": 30, "max": 600, "step": 10,
+      "default": 120,
+      "persist": true,
+      "unit": "s",
+      "description": "Delay before PI starts after compressor on"
+    },
+    "eev.min_pos": {
+      "type": "float",
+      "access": "readwrite",
+      "min": 0.0, "max": 30.0, "step": 1.0,
+      "default": 5.0,
+      "persist": true,
+      "unit": "%",
+      "description": "Minimum valve position during regulation"
+    },
+    "eev.max_pos": {
+      "type": "float",
+      "access": "readwrite",
+      "min": 50.0, "max": 100.0, "step": 1.0,
+      "default": 95.0,
+      "persist": true,
+      "unit": "%",
+      "description": "Maximum valve position during regulation"
+    },
+    "eev.safe_pos": {
+      "type": "float",
+      "access": "readwrite",
+      "min": 20.0, "max": 60.0, "step": 1.0,
+      "default": 40.0,
+      "persist": true,
+      "unit": "%",
+      "description": "Safe position on sensor failure"
+    },
+    "eev.low_sh_limit": {
+      "type": "float",
+      "access": "readwrite",
+      "min": 0.0, "max": 5.0, "step": 0.5,
+      "default": 2.0,
+      "persist": true,
+      "unit": "K",
+      "description": "Low superheat protection threshold"
+    },
+    "eev.mop_pressure": {
+      "type": "float",
+      "access": "readwrite",
+      "min": 0.0, "max": 30.0, "step": 0.5,
+      "default": 0.0,
+      "persist": true,
+      "unit": "bar",
+      "description": "Maximum Operating Pressure (0=disabled)"
+    },
+    "eev.deadband": {
+      "type": "float",
+      "access": "readwrite",
+      "min": 0.0, "max": 5.0, "step": 0.1,
+      "default": 1.0,
+      "persist": true,
+      "unit": "K",
+      "description": "PI deadband around setpoint (anti-hunting)"
+    },
+    "eev.pi_interval": {
+      "type": "int",
+      "access": "readwrite",
+      "min": 1, "max": 30, "step": 1,
+      "default": 3,
+      "persist": true,
+      "unit": "s",
+      "description": "PI calculation interval"
+    }
+  },
+
+  "mqtt": {
+    "publish": [
+      "eev.superheat", "eev.t_sat", "eev.valve_pos", "eev.state",
+      "eev.pi_output", "eev.sh_target"
+    ],
+    "subscribe": [
+      "eev.sh_target", "eev.kp", "eev.ki",
+      "eev.startup_pos", "eev.startup_wait",
+      "eev.min_pos", "eev.max_pos", "eev.safe_pos",
+      "eev.low_sh_limit", "eev.mop_pressure", "eev.deadband",
+      "eev.pi_interval"
+    ]
+  },
+
+  "ui": {
+    "page": "EEV",
+    "icon": "thermometer",
+    "cards": [
+      {
+        "title": "Перегрів",
+        "icon": "thermometer",
+        "columns": 2,
+        "widgets": [
+          {"key": "eev.superheat", "widget": "gauge", "label": "Перегрів", "unit": "K", "min": -5, "max": 30},
+          {"key": "eev.t_sat", "widget": "value", "label": "T насичення", "unit": "°C"},
+          {"key": "eev.valve_pos", "widget": "gauge", "label": "Клапан", "unit": "%", "min": 0, "max": 100},
+          {"key": "eev.state", "widget": "status_text", "label": "Стан"},
+          {"key": "eev.pi_output", "widget": "value", "label": "PI вихід"}
+        ]
+      },
+      {
+        "title": "Налаштування PI",
+        "icon": "settings",
+        "columns": 2,
+        "feature": "superheat_control",
+        "widgets": [
+          {"key": "eev.sh_target", "widget": "number_input", "label": "Цільовий перегрів", "unit": "K"},
+          {"key": "eev.deadband", "widget": "number_input", "label": "Зона нечутливості", "unit": "K"},
+          {"key": "eev.kp", "widget": "number_input", "label": "Kp"},
+          {"key": "eev.ki", "widget": "number_input", "label": "Ki"},
+          {"key": "eev.pi_interval", "widget": "number_input", "label": "Інтервал PI", "unit": "с"},
+          {"key": "eev.startup_pos", "widget": "number_input", "label": "Стартова позиція", "unit": "%"},
+          {"key": "eev.startup_wait", "widget": "number_input", "label": "Затримка старту", "unit": "с"}
+        ]
+      },
+      {
+        "title": "Безпека",
+        "icon": "shield",
+        "columns": 2,
+        "feature": "superheat_control",
+        "widgets": [
+          {"key": "eev.min_pos", "widget": "number_input", "label": "Мін. позиція", "unit": "%"},
+          {"key": "eev.max_pos", "widget": "number_input", "label": "Макс. позиція", "unit": "%"},
+          {"key": "eev.safe_pos", "widget": "number_input", "label": "Безпечна позиція", "unit": "%"},
+          {"key": "eev.low_sh_limit", "widget": "number_input", "label": "Мін. перегрів", "unit": "K"},
+          {"key": "eev.mop_pressure", "widget": "number_input", "label": "MOP тиск", "unit": "bar"}
+        ]
+      }
+    ]
+  }
+}

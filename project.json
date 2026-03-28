@@ -8,7 +8,8 @@
     "thermostat",
     "defrost",
     "lighting",
-    "datalogger"
+    "datalogger",
+    "eev"
   ],
   "system": {
     "device_name": "ModESP",

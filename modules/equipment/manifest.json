@@ -13,7 +13,10 @@
     {"role": "cond_fan",       "type": "actuator", "driver": ["relay", "pcf8574_relay"], "label": "Вент. конденсатора",   "optional": true},
     {"role": "door_contact",   "type": "sensor",   "driver": ["digital_input", "pcf8574_input"], "label": "Контакт дверей",       "optional": true},
     {"role": "night_input",    "type": "sensor",   "driver": ["digital_input", "pcf8574_input"], "label": "Вхід нічного режиму",  "optional": true},
-    {"role": "light",          "type": "actuator", "driver": ["relay", "pcf8574_relay"], "label": "Освітлення камери",    "optional": true}
+    {"role": "light",          "type": "actuator", "driver": ["relay", "pcf8574_relay"], "label": "Освітлення камери",    "optional": true},
+    {"role": "suction_p",     "type": "sensor",   "driver": ["pressure_adc"],          "label": "Тиск всмоктування",    "optional": true},
+    {"role": "discharge_p",   "type": "sensor",   "driver": ["pressure_adc"],          "label": "Тиск нагнітання",      "optional": true},
+    {"role": "eev",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "akv_pulse"], "label": "Клапан EEV", "optional": true}
   ],
 
   "state": {
@@ -37,6 +40,14 @@
     "equipment.light":            {"type": "bool",  "access": "read", "description": "Фактичний стан освітлення"},
     "equipment.has_light":        {"type": "bool",  "access": "read", "description": "Реле освітлення доступне"},
     "equipment.has_ntc_driver":   {"type": "bool",  "access": "read", "description": "Використовується NTC драйвер"},
+    "equipment.has_suction_p":   {"type": "bool",  "access": "read", "description": "Датчик тиску всмоктування доступний"},
+    "equipment.has_discharge_p": {"type": "bool",  "access": "read", "description": "Датчик тиску нагнітання доступний"},
+    "equipment.has_eev":         {"type": "bool",  "access": "read", "description": "EEV клапан доступний"},
+    "equipment.suction_bar":     {"type": "float", "access": "read", "unit": "bar", "description": "Тиск всмоктування"},
+    "equipment.discharge_bar":   {"type": "float", "access": "read", "unit": "bar", "description": "Тиск нагнітання"},
+    "equipment.refrigerant":     {"type": "int",   "access": "readwrite", "persist": true,
+                                  "min": 0, "max": 22, "step": 1, "default": 0,
+                                  "description": "Тип холодоагенту (0=R134a, 1=R404A, ...)"},
     "equipment.has_ds18b20_driver": {"type": "bool", "access": "read", "description": "Використовується DS18B20 драйвер"},
 
     "equipment.filter_coeff":    {"type": "int", "access": "readwrite", "persist": true,

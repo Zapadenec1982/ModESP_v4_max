@@ -1,0 +1,11 @@
+{
+  "manifest_version": 1,
+  "driver": "eev_analog",
+  "description": "DAC 0-10V клапан (EVD Mini / EKF positioner)",
+  "category": "actuator",
+  "hardware_type": "dac_channel",
+  "requires_address": false,
+  "multiple_per_bus": false,
+  "provides": {"type": "float"},
+  "settings": []
+}

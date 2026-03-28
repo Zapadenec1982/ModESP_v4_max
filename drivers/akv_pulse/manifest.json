@@ -1,0 +1,11 @@
+{
+  "manifest_version": 1,
+  "driver": "akv_pulse",
+  "description": "PWM соленоїдний клапан (Danfoss AKV)",
+  "category": "actuator",
+  "hardware_type": "gpio_output",
+  "requires_address": false,
+  "multiple_per_bus": false,
+  "provides": {"type": "float"},
+  "settings": []
+}

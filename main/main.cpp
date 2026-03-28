@@ -58,6 +58,7 @@
 #include "defrost_module.h"
 #include "lighting_module.h"
 #include "datalogger_module.h"
+#include "eev_module.h"
 
 #include "esp_log.h"
 #include "esp_task_wdt.h"
@@ -115,6 +116,9 @@ static DefrostModule           defrost;
 
 // Lighting (NORMAL priority — chamber light control)
 static LightingModule          lighting;
+
+// EEV superheat controller (NORMAL priority — after equipment/protection)
+static EevModule               eev;
 
 // DataLogger (LOW priority — logging, runs after business logic)
 static DataLoggerModule        datalogger;
@@ -246,6 +250,9 @@ extern "C" void app_main(void)
 
     // Lighting — освітлення камери (NORMAL priority, reads thermostat.night_active)
     app.modules().register_module(lighting);
+
+    // EEV — superheat PI controller (NORMAL priority, reads equipment + defrost)
+    app.modules().register_module(eev);
 
     // DataLogger — логування температури та подій (LOW priority)
     app.modules().register_module(datalogger);
