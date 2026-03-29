@@ -50,6 +50,11 @@ void EevModule::sync_settings() {
     deadband_       = read_float(ns_key("deadband"), deadband_);
     pi_interval_ms_ = static_cast<uint32_t>(read_int(ns_key("pi_interval"), 3)) * 1000;
     exercise_interval_ms_ = static_cast<uint32_t>(read_int(ns_key("exercise_interval"), 24)) * 3600000UL;
+
+    // Smooth Lines (MPXPRO PSM)
+    smooth_lines_enabled_ = read_bool(ns_key("smooth_lines"), false);
+    smooth_max_offset_    = read_float(ns_key("smooth_max_offset"), 15.0f);
+    smooth_plt_           = read_float(ns_key("smooth_plt"), 2.0f);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -329,7 +334,27 @@ void EevModule::on_update(uint32_t dt_ms) {
                     position_ += open_rate;
                     if (position_ > max_pos_) position_ = max_pos_;
                 } else {
-                    update_pi(superheat_, sh_target_);
+                    // Smooth Lines: modulate SH target based on cabinet temperature
+                    effective_sh_target_ = sh_target_;
+                    if (smooth_lines_enabled_) {
+                        float cab_temp = read_input_float("thermostat.temperature");
+                        float setpoint = read_input_float("thermostat.effective_setpoint");
+                        if (!__builtin_isnan(cab_temp) && !__builtin_isnan(setpoint)) {
+                            float diff = cab_temp - setpoint;
+                            if (diff < -smooth_plt_) {
+                                // Temp below setpoint - PLt → max SH offset (close valve)
+                                effective_sh_target_ = sh_target_ + smooth_max_offset_;
+                            } else if (diff > 0.0f) {
+                                // Temp above setpoint → normal SH target
+                                effective_sh_target_ = sh_target_;
+                            } else {
+                                // Between setpoint and setpoint-PLt → proportional offset
+                                float ratio = 1.0f - (diff + smooth_plt_) / smooth_plt_;
+                                effective_sh_target_ = sh_target_ + smooth_max_offset_ * ratio;
+                            }
+                        }
+                    }
+                    update_pi(superheat_, effective_sh_target_);
                 }
                 set_valve_position(position_);
             }

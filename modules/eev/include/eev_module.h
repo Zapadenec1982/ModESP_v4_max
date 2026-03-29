@@ -79,6 +79,12 @@ private:
     uint32_t pi_interval_ms_ = 3000;  // PI calculation interval
     uint32_t exercise_interval_ms_ = 86400000;  // Valve exercise interval (default 24h, 0=off)
 
+    // ── Smooth Lines (MPXPRO PSM) — dynamic SH setpoint by cabinet T ──
+    bool     smooth_lines_enabled_ = false;
+    float    smooth_max_offset_    = 15.0f;   // Max SH offset (K) above sh_target_
+    float    smooth_plt_           = 2.0f;    // Offset below setpoint to stop control (°C)
+    float    effective_sh_target_  = 8.0f;    // Runtime: sh_target + smooth offset
+
     // ── Inputs cache ──
     float suction_bar_ = 0.0f;
     float evap_temp_ = 0.0f;

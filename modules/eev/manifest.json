@@ -45,6 +45,18 @@
       "type": "int",
       "optional": true,
       "description": "Індекс типу холодоагенту (з saturation.h)"
+    },
+    "thermostat.temperature": {
+      "source_module": "thermostat",
+      "type": "float",
+      "optional": true,
+      "description": "Температура камери (для Smooth Lines)"
+    },
+    "thermostat.effective_setpoint": {
+      "source_module": "thermostat",
+      "type": "float",
+      "optional": true,
+      "description": "Ефективний setpoint (для Smooth Lines)"
     }
   },
 
@@ -221,6 +233,31 @@
       "unit": "год",
       "description": "Інтервал розблокування клапана (0=вимкнено)"
     },
+    "eev.smooth_lines": {
+      "type": "bool",
+      "access": "readwrite",
+      "default": false,
+      "persist": true,
+      "description": "Smooth Lines — динамічний SH setpoint по T камери"
+    },
+    "eev.smooth_max_offset": {
+      "type": "float",
+      "unit": "K",
+      "access": "readwrite",
+      "min": 0, "max": 50, "step": 1,
+      "default": 15,
+      "persist": true,
+      "description": "Макс. зміщення SH (Smooth Lines)"
+    },
+    "eev.smooth_plt": {
+      "type": "float",
+      "unit": "°C",
+      "access": "readwrite",
+      "min": 0, "max": 10, "step": 0.5,
+      "default": 2.0,
+      "persist": true,
+      "description": "Offset нижче setpoint для зупинки (Smooth Lines)"
+    },
     "eev.valve_type": {
       "type": "int",
       "access": "readwrite",
@@ -255,7 +292,8 @@
       "eev.startup_pos", "eev.startup_wait",
       "eev.min_pos", "eev.max_pos", "eev.safe_pos",
       "eev.low_sh_limit", "eev.mop_pressure", "eev.lop_pressure", "eev.deadband",
-      "eev.pi_interval", "eev.exercise_interval"
+      "eev.pi_interval", "eev.exercise_interval",
+      "eev.smooth_lines", "eev.smooth_max_offset", "eev.smooth_plt"
     ]
   },
 
