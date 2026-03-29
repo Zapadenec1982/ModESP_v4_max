@@ -382,13 +382,13 @@ class TestDefrostManifest:
 
     def test_has_28_state_keys(self, defrost):
         """Defrost має 28 state keys."""
-        assert len(defrost["state"]) == 31
+        assert len(defrost["state"]) == 35
 
     def test_14_persist_readwrite_params(self, defrost):
         """Defrost має 14 readwrite persist параметрів."""
         rw_persist = sum(1 for v in defrost["state"].values()
                          if v.get("access") == "readwrite" and v.get("persist") is True)
-        assert rw_persist == 16
+        assert rw_persist == 19
 
     def test_no_readonly_persist_params(self, defrost):
         """Defrost не має read-only persist params (interval_timer/defrost_count скидаються при ребуті)."""
@@ -411,7 +411,7 @@ class TestDefrostManifest:
     def test_phase_enum(self, defrost):
         """defrost.phase має 7 enum значень."""
         p = defrost["state"]["defrost.phase"]
-        expected = {"idle", "stabilize", "valve_open", "active", "equalize", "drip", "fad"}
+        expected = {"idle", "pump_down", "stabilize", "valve_open", "active", "equalize", "drip", "fad"}
         assert set(p["enum"]) == expected
 
     def test_type_has_options(self, defrost):
@@ -426,14 +426,15 @@ class TestDefrostManifest:
         i = defrost["state"]["defrost.initiation"]
         assert "options" in i
         values = [o["value"] for o in i["options"]]
-        assert values == [0, 1, 2, 3]
+        assert values == [0, 1, 2, 3, 4]
 
     def test_4_request_keys(self, defrost):
         """Defrost має 4 request keys."""
         req_keys = [k for k in defrost["state"] if k.startswith("defrost.req.")]
-        assert len(req_keys) == 4
+        assert len(req_keys) == 5
         expected = {"defrost.req.compressor", "defrost.req.defrost_relay",
-                    "defrost.req.evap_fan", "defrost.req.cond_fan"}
+                    "defrost.req.evap_fan", "defrost.req.cond_fan",
+                    "defrost.req.eev_close"}
         assert set(req_keys) == expected
 
     def test_has_6_inputs(self, defrost):
@@ -458,11 +459,11 @@ class TestDefrostManifest:
 
     def test_mqtt_10_publish(self, defrost):
         """MQTT публікує 10 keys."""
-        assert len(defrost["mqtt"]["publish"]) == 11
+        assert len(defrost["mqtt"]["publish"]) == 11  # unchanged (new keys are read-only internal)
 
     def test_mqtt_15_subscribe(self, defrost):
         """MQTT підписка на 15 settings."""
-        assert len(defrost["mqtt"]["subscribe"]) == 17
+        assert len(defrost["mqtt"]["subscribe"]) == 20
 
     def test_end_temp_range(self, defrost):
         """end_temp: min=-5, max=30, default=8."""
@@ -539,9 +540,9 @@ class TestCrossModuleValidation:
         assert len(therm_errors) == 0, f"Thermostat errors: {therm_errors}"
 
     def test_total_state_keys(self, all_manifests):
-        """Всього 210 state keys у 7 модулях."""
+        """Всього 214 state keys у 7 модулях."""
         total = sum(len(m.get("state", {})) for m in all_manifests)
-        assert total == 210
+        assert total == 214
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -680,7 +681,7 @@ class TestStateMetaFullProject:
         # datalogger: enabled, retention_hours, sample_interval, log_evap, log_cond,
         #   log_setpoint, log_humidity = 7 rw
         # Total: 61 (auto-counted from manifests)
-        assert "STATE_META_COUNT = 97" in result
+        assert "STATE_META_COUNT = 100" in result
 
     def test_persist_true_for_setpoint(self, all_manifests):
         """thermostat.setpoint — writable=true, persist=true."""
@@ -726,7 +727,7 @@ class TestMqttTopicsFullProject:
         gen = MqttTopicsGenerator()
         result = gen.generate(all_manifests)
         # equipment=5, protection=16, thermostat=17, defrost=15, datalogger=7 = 60
-        assert "MQTT_SUBSCRIBE_COUNT = 88" in result
+        assert "MQTT_SUBSCRIBE_COUNT = 91" in result
 
     def test_contains_all_module_topics(self, all_manifests):
         """Містить topics від усіх модулів."""

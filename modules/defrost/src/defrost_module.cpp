@@ -55,6 +55,13 @@ void DefrostModule::sync_settings() {
     // Секунди → мілісекунди
     valve_delay_ms_ = static_cast<uint32_t>(read_int(ns_key("valve_delay"), 3)) * 1000;
 
+    // Pump Down (MPXPRO dH1) — секунди → мілісекунди
+    pump_down_time_ms_ = static_cast<uint32_t>(read_int(ns_key("pump_down_time"), 0)) * 1000;
+
+    // Running Time defrost (MPXPRO d10/d11) — хвилини → мілісекунди
+    running_time_ms_   = static_cast<uint32_t>(read_int(ns_key("running_time"), 0)) * 60000;
+    running_time_temp_ = read_float(ns_key("running_time_temp"), -30.0f);
+
     // Early termination (MPXPRO dEP/dET)
     early_term_enabled_ = read_bool(ns_key("early_term_enabled"), false);
     early_term_temp_    = read_float(ns_key("early_term_temp"), 12.0f);
@@ -67,6 +74,7 @@ void DefrostModule::sync_settings() {
 const char* DefrostModule::phase_name() const {
     switch (phase_) {
         case Phase::IDLE:       return "idle";
+        case Phase::PUMP_DOWN:  return "pump_down";
         case Phase::STABILIZE:  return "stabilize";
         case Phase::VALVE_OPEN: return "valve_open";
         case Phase::ACTIVE:     return "active";
@@ -123,10 +131,21 @@ void DefrostModule::enter_phase(Phase p) {
             state_set(ns_key("state"), "idle");
             break;
 
+        case Phase::PUMP_DOWN:
+            // Pump Down: comp ON, EEV/solenoid closed, fan OFF — спорожнення випарника
+            set_requests(true, false, false, false);
+            // Signal EEV to close (0%)
+            state_set(ns_key("req.eev_close"), true);
+            state_set(ns_key("state"), "pump_down");
+            ESP_LOGI(TAG, "Pump down started (%lu s)", pump_down_time_ms_ / 1000);
+            break;
+
         case Phase::STABILIZE:
             // dFT=2, Фаза 1: компресор ON + конд.вент ON, реле OFF
             // Тиск стабілізується перед відкриттям клапана ГГ
             set_requests(true, false, false, true);
+            // Pump down завершено — дозволяємо EEV
+            state_set(ns_key("req.eev_close"), false);
             state_set(ns_key("state"), "stabilize");
             break;
 
@@ -271,6 +290,9 @@ void DefrostModule::on_update(uint32_t dt_ms) {
         case Phase::IDLE:
             update_idle(dt_ms);
             break;
+        case Phase::PUMP_DOWN:
+            update_pump_down(dt_ms);
+            break;
         case Phase::STABILIZE:
             update_stabilize(dt_ms);
             break;
@@ -320,11 +342,26 @@ void DefrostModule::update_idle(uint32_t dt_ms) {
         }
     }
 
+    // Running Time trigger (mode 4): comp ON + T_evap < threshold → counter++
+    bool running_trigger = false;
+    if (initiation_ == 4 && running_time_ms_ > 0) {
+        if (compressor_on_ && sensor2_ok_ && evap_temp_ < running_time_temp_) {
+            running_time_counter_ms_ += dt_ms;
+            if (running_time_counter_ms_ >= running_time_ms_) {
+                running_trigger = true;
+                running_time_counter_ms_ = 0;
+            }
+        } else {
+            // Reset counter коли T піднімається або comp OFF
+            running_time_counter_ms_ = 0;
+        }
+    }
+
     // Перевіряємо triggers
     bool timer_trigger  = (initiation_ == 0 || initiation_ == 2) && check_timer_trigger();
     bool demand_trigger = (initiation_ == 1 || initiation_ == 2) && check_demand_trigger();
 
-    if (timer_trigger || demand_trigger) {
+    if (timer_trigger || demand_trigger || running_trigger) {
         // Оптимізація: випарник чистий → скасовуємо (тільки в temp-mode)
         if (termination_ == 0 && sensor2_ok_ && evap_temp_ > end_temp_) {
             ESP_LOGI(TAG, "Defrost skipped — evap clean (%.1f > %.1f)",
@@ -332,7 +369,8 @@ void DefrostModule::update_idle(uint32_t dt_ms) {
             interval_timer_ms_ = 0;
             return;
         }
-        start_defrost(timer_trigger ? "timer" : "demand");
+        const char* reason = timer_trigger ? "timer" : (demand_trigger ? "demand" : "running_time");
+        start_defrost(reason);
     }
 }
 
@@ -368,12 +406,31 @@ void DefrostModule::start_defrost(const char* reason) {
     ESP_LOGI(TAG, "Starting defrost (%s), type=%ld", reason, static_cast<long>(active_defrost_type_));
     interval_timer_ms_ = 0;
 
-    if (active_defrost_type_ == 2) {
+    // Pump Down перед defrost (якщо enabled)
+    if (pump_down_time_ms_ > 0) {
+        enter_phase(Phase::PUMP_DOWN);
+    } else if (active_defrost_type_ == 2) {
         // Гарячий газ → починаємо зі стабілізації
         enter_phase(Phase::STABILIZE);
     } else {
         // Природна або тен → одразу active
         enter_phase(Phase::ACTIVE);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Pump Down — спорожнення випарника (MPXPRO dH1)
+// ═══════════════════════════════════════════════════════════════
+
+void DefrostModule::update_pump_down(uint32_t dt_ms) {
+    phase_timer_ms_ += dt_ms;
+    if (phase_timer_ms_ >= pump_down_time_ms_) {
+        ESP_LOGI(TAG, "Pump down complete (%lu s)", pump_down_time_ms_ / 1000);
+        if (active_defrost_type_ == 2) {
+            enter_phase(Phase::STABILIZE);
+        } else {
+            enter_phase(Phase::ACTIVE);
+        }
     }
 }
 

@@ -63,7 +63,7 @@ public:
     void on_stop() override;
 
 private:
-    enum class Phase { IDLE, STABILIZE, VALVE_OPEN, ACTIVE, EQUALIZE, DRIP, FAD };
+    enum class Phase { IDLE, PUMP_DOWN, STABILIZE, VALVE_OPEN, ACTIVE, EQUALIZE, DRIP, FAD };
     Phase phase_ = Phase::IDLE;
 
     void enter_phase(Phase p);
@@ -79,6 +79,7 @@ private:
     void update_active_phase(uint32_t dt_ms);
     void update_drip(uint32_t dt_ms);
     void update_fad(uint32_t dt_ms);
+    void update_pump_down(uint32_t dt_ms);
     void update_stabilize(uint32_t dt_ms);
     void update_valve_open(uint32_t dt_ms);
     void update_equalize(uint32_t dt_ms);
@@ -110,6 +111,14 @@ private:
     uint32_t stabilize_ms_     = 30000;     // Phase 1: 30s
     uint32_t valve_delay_ms_   = 3000;      // Phase 2: 3s
     uint32_t equalize_ms_      = 90000;     // Phase 4: 90s
+
+    // Pump Down — спорожнення випарника перед defrost (MPXPRO dH1)
+    uint32_t pump_down_time_ms_   = 0;        // 0=disabled, seconds→ms
+
+    // Running Time defrost (MPXPRO d10/d11) — initiation mode 4
+    uint32_t running_time_ms_     = 0;        // Час компресора нижче порогу → trigger
+    float    running_time_temp_   = -30.0f;   // Поріг T_evap для running time
+    uint32_t running_time_counter_ms_ = 0;    // Runtime counter
 
     // Early termination — safety limit на T_cabinet під час defrost (MPXPRO dEP/dET)
     bool     early_term_enabled_  = false;

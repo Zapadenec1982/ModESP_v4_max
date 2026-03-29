@@ -102,7 +102,8 @@
         "0": {"always": true},
         "1": {"requires_feature": "defrost_by_sensor", "disabled_hint": "Потрібен датчик випарника (evap_temp)"},
         "2": {"requires_feature": "defrost_by_sensor", "disabled_hint": "Потрібен датчик випарника (evap_temp)"},
-        "3": {"always": true}
+        "3": {"always": true},
+        "4": {"requires_feature": "defrost_by_sensor", "disabled_hint": "Потрібен датчик випарника (evap_temp)"}
       }
     },
     "defrost.termination": {
@@ -123,7 +124,7 @@
     "defrost.phase": {
       "type": "string",
       "access": "read",
-      "enum": ["idle", "stabilize", "valve_open", "active", "equalize", "drip", "fad"],
+      "enum": ["idle", "pump_down", "stabilize", "valve_open", "active", "equalize", "drip", "fad"],
       "description": "Поточна фаза відтайки"
     },
     "defrost.state": {
@@ -230,7 +231,8 @@
         {"value": 0, "label": "За таймером"},
         {"value": 1, "label": "За температурою випарника"},
         {"value": 2, "label": "Комбінований"},
-        {"value": 3, "label": "Вимкнено"}
+        {"value": 3, "label": "Вимкнено"},
+        {"value": 4, "label": "За часом роботи (running time)"}
       ],
       "description": "Ініціація розморозки"
     },
@@ -343,6 +345,44 @@
       "default": 2,
       "persist": true,
       "description": "Час вирівнювання тиску (гарячий газ)"
+    },
+    "defrost.running_time": {
+      "type": "int",
+      "unit": "хв",
+      "access": "readwrite",
+      "min": 0,
+      "max": 240,
+      "step": 5,
+      "default": 0,
+      "persist": true,
+      "description": "Час роботи comp з низькою T_evap для trigger (0=вимкнено)"
+    },
+    "defrost.running_time_temp": {
+      "type": "float",
+      "unit": "\u00b0C",
+      "access": "readwrite",
+      "min": -40.0,
+      "max": 0.0,
+      "step": 1.0,
+      "default": -30.0,
+      "persist": true,
+      "description": "Поріг T_evap для running time defrost"
+    },
+    "defrost.pump_down_time": {
+      "type": "int",
+      "unit": "с",
+      "access": "readwrite",
+      "min": 0,
+      "max": 300,
+      "step": 5,
+      "default": 0,
+      "persist": true,
+      "description": "Pump down перед відтайкою (0=вимкнено)"
+    },
+    "defrost.req.eev_close": {
+      "type": "bool",
+      "access": "read",
+      "description": "Запит закриття EEV (pump down)"
     },
     "defrost.early_term_enabled": {
       "type": "bool",
@@ -465,6 +505,20 @@
             "widget": "number_input"
           },
           {
+            "key": "defrost.running_time",
+            "widget": "number_input",
+            "visible_when": {"key": "defrost.initiation", "eq": 4}
+          },
+          {
+            "key": "defrost.running_time_temp",
+            "widget": "number_input",
+            "visible_when": {"key": "defrost.initiation", "eq": 4}
+          },
+          {
+            "key": "defrost.pump_down_time",
+            "widget": "number_input"
+          },
+          {
             "key": "defrost.early_term_enabled",
             "widget": "toggle"
           },
@@ -537,7 +591,10 @@
       "defrost.equalize_time",
       "defrost.manual_start",
       "defrost.early_term_enabled",
-      "defrost.early_term_temp"
+      "defrost.early_term_temp",
+      "defrost.pump_down_time",
+      "defrost.running_time",
+      "defrost.running_time_temp"
     ]
   },
 
