@@ -22,8 +22,8 @@
 
 - [x] Pump Down (Phase::PUMP_DOWN, EEV close, comp ON before defrost)
 - [x] Running Time defrost (initiation mode 4, comp+T_evap counter)
-- [ ] Skip Defrost — MPXPRO algorithm (counter-based)
-- [ ] Power Defrost (enhanced night defrost)
+- [x] Skip Defrost — MPXPRO counter algorithm (warmup 7, max skip 3)
+- [x] Power Defrost (enhanced night: +end_temp_delta, +duration_delta)
 
 ## Phase 3 — Extended
 
