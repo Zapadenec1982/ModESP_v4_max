@@ -382,13 +382,13 @@ class TestDefrostManifest:
 
     def test_has_28_state_keys(self, defrost):
         """Defrost має 28 state keys."""
-        assert len(defrost["state"]) == 35
+        assert len(defrost["state"]) == 39
 
     def test_14_persist_readwrite_params(self, defrost):
         """Defrost має 14 readwrite persist параметрів."""
         rw_persist = sum(1 for v in defrost["state"].values()
                          if v.get("access") == "readwrite" and v.get("persist") is True)
-        assert rw_persist == 19
+        assert rw_persist == 23
 
     def test_no_readonly_persist_params(self, defrost):
         """Defrost не має read-only persist params (interval_timer/defrost_count скидаються при ребуті)."""
@@ -439,7 +439,7 @@ class TestDefrostManifest:
 
     def test_has_6_inputs(self, defrost):
         """Defrost має 6 inputs."""
-        assert len(defrost["inputs"]) == 8
+        assert len(defrost["inputs"]) == 9
 
     def test_compressor_input_required(self, defrost):
         """equipment.compressor — обов'язковий input (для dct=2)."""
@@ -463,7 +463,7 @@ class TestDefrostManifest:
 
     def test_mqtt_15_subscribe(self, defrost):
         """MQTT підписка на 15 settings."""
-        assert len(defrost["mqtt"]["subscribe"]) == 20
+        assert len(defrost["mqtt"]["subscribe"]) == 24
 
     def test_end_temp_range(self, defrost):
         """end_temp: min=-5, max=30, default=8."""
@@ -540,9 +540,9 @@ class TestCrossModuleValidation:
         assert len(therm_errors) == 0, f"Thermostat errors: {therm_errors}"
 
     def test_total_state_keys(self, all_manifests):
-        """Всього 214 state keys у 7 модулях."""
+        """Всього 218 state keys у 7 модулях."""
         total = sum(len(m.get("state", {})) for m in all_manifests)
-        assert total == 214
+        assert total == 218
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -681,7 +681,7 @@ class TestStateMetaFullProject:
         # datalogger: enabled, retention_hours, sample_interval, log_evap, log_cond,
         #   log_setpoint, log_humidity = 7 rw
         # Total: 61 (auto-counted from manifests)
-        assert "STATE_META_COUNT = 100" in result
+        assert "STATE_META_COUNT = 104" in result
 
     def test_persist_true_for_setpoint(self, all_manifests):
         """thermostat.setpoint — writable=true, persist=true."""
@@ -727,7 +727,7 @@ class TestMqttTopicsFullProject:
         gen = MqttTopicsGenerator()
         result = gen.generate(all_manifests)
         # equipment=5, protection=16, thermostat=17, defrost=15, datalogger=7 = 60
-        assert "MQTT_SUBSCRIBE_COUNT = 91" in result
+        assert "MQTT_SUBSCRIBE_COUNT = 95" in result
 
     def test_contains_all_module_topics(self, all_manifests):
         """Містить topics від усіх модулів."""

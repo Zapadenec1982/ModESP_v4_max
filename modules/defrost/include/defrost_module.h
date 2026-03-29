@@ -120,6 +120,19 @@ private:
     float    running_time_temp_   = -30.0f;   // Поріг T_evap для running time
     uint32_t running_time_counter_ms_ = 0;    // Runtime counter
 
+    // Skip Defrost (MPXPRO d7/dn) — counter-based algorithm
+    bool     skip_enabled_        = false;
+    int32_t  skip_threshold_pct_  = 75;       // % від max_duration: short defrost → skip
+    int32_t  skip_counter_        = 0;        // 0=no skip, 1=skip 1, 2=skip 2, 3=skip 3 (max)
+    int32_t  skip_remaining_      = 0;        // Defrosts to skip
+    int32_t  warmup_count_        = 0;        // Перші 7 defrosts — не skip (learning)
+
+    // Power Defrost (MPXPRO ddt/ddP) — enhanced night defrost
+    float    power_end_temp_delta_  = 0.0f;   // °C додати до end_temp вночі
+    int32_t  power_duration_delta_  = 0;      // хв додати до max_duration вночі
+    float    effective_end_temp_    = 8.0f;    // Runtime: end_temp (+ power delta if night)
+    uint32_t effective_max_dur_ms_  = 1800000; // Runtime: max_duration (+ power delta if night)
+
     // Early termination — safety limit на T_cabinet під час defrost (MPXPRO dEP/dET)
     bool     early_term_enabled_  = false;
     float    early_term_temp_     = 12.0f;    // °C — макс. допустима T камери під час відтайки

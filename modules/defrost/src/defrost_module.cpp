@@ -62,6 +62,14 @@ void DefrostModule::sync_settings() {
     running_time_ms_   = static_cast<uint32_t>(read_int(ns_key("running_time"), 0)) * 60000;
     running_time_temp_ = read_float(ns_key("running_time_temp"), -30.0f);
 
+    // Skip Defrost (MPXPRO d7/dn)
+    skip_enabled_       = read_bool(ns_key("skip_enabled"), false);
+    skip_threshold_pct_ = read_int(ns_key("skip_threshold"), 75);
+
+    // Power Defrost (MPXPRO ddt/ddP)
+    power_end_temp_delta_  = read_float(ns_key("power_end_temp_delta"), 0.0f);
+    power_duration_delta_  = read_int(ns_key("power_duration_delta"), 0);
+
     // Early termination (MPXPRO dEP/dET)
     early_term_enabled_ = read_bool(ns_key("early_term_enabled"), false);
     early_term_temp_    = read_float(ns_key("early_term_temp"), 12.0f);
@@ -369,6 +377,15 @@ void DefrostModule::update_idle(uint32_t dt_ms) {
             interval_timer_ms_ = 0;
             return;
         }
+
+        // Skip Defrost (MPXPRO algorithm): counter-based skipping
+        if (skip_enabled_ && skip_remaining_ > 0) {
+            skip_remaining_--;
+            ESP_LOGI(TAG, "Defrost skipped by counter (%ld remaining)", static_cast<long>(skip_remaining_));
+            interval_timer_ms_ = 0;
+            return;
+        }
+
         const char* reason = timer_trigger ? "timer" : (demand_trigger ? "demand" : "running_time");
         start_defrost(reason);
     }
@@ -402,6 +419,22 @@ void DefrostModule::start_defrost(const char* reason) {
                  static_cast<long>(active_defrost_type_));
         active_defrost_type_ = 0;
     }
+
+    // Power Defrost: підсилений дефрост вночі (MPXPRO ddt/ddP)
+    bool night_active = read_input_bool("thermostat.night_active");
+    float effective_end_temp = end_temp_;
+    uint32_t effective_max_duration = max_duration_ms_;
+    if (night_active && (power_end_temp_delta_ != 0.0f || power_duration_delta_ != 0)) {
+        effective_end_temp += power_end_temp_delta_;
+        effective_max_duration += static_cast<uint32_t>(power_duration_delta_) * 60000;
+        ESP_LOGI(TAG, "Power Defrost (night): end_temp %.1f→%.1f°C, max_dur %lu→%lu min",
+                 end_temp_, effective_end_temp,
+                 max_duration_ms_ / 60000, effective_max_duration / 60000);
+    }
+
+    // Зберігаємо effective values для цього циклу
+    effective_end_temp_   = effective_end_temp;
+    effective_max_dur_ms_ = effective_max_duration;
 
     ESP_LOGI(TAG, "Starting defrost (%s), type=%ld", reason, static_cast<long>(active_defrost_type_));
     interval_timer_ms_ = 0;
@@ -469,7 +502,7 @@ void DefrostModule::update_active_phase(uint32_t dt_ms) {
     // Завершення по T_evap (тільки в temp-mode, після мінімального часу)
     // MIN_ACTIVE_CHECK_MS запобігає миттєвому завершенню при високій T_evap (тест/сплеск)
     if (termination_ == 0 && phase_timer_ms_ >= MIN_ACTIVE_CHECK_MS) {
-        if (sensor2_ok_ && evap_temp_ >= end_temp_) {
+        if (sensor2_ok_ && evap_temp_ >= effective_end_temp_) {
             consecutive_timeouts_ = 0;
             state_set(ns_key("heater_alarm"), false);
             state_set(ns_key("last_termination"), "temp");
@@ -494,7 +527,7 @@ void DefrostModule::update_active_phase(uint32_t dt_ms) {
     }
 
     // Завершення по таймеру (dEt) — завжди працює в обох modes
-    if (phase_timer_ms_ >= max_duration_ms_) {
+    if (phase_timer_ms_ >= effective_max_dur_ms_) {
         if (termination_ == 0) {
             // temp-mode: таймер = safety backup → лічильник таймаутів
             consecutive_timeouts_++;
@@ -516,8 +549,31 @@ void DefrostModule::update_active_phase(uint32_t dt_ms) {
 void DefrostModule::finish_active_phase(const char* reason) {
     defrost_count_++;
     state_set(ns_key("defrost_count"), defrost_count_);
-    ESP_LOGI(TAG, "Active defrost finished (%s), count=%ld",
-             reason, static_cast<long>(defrost_count_));
+    ESP_LOGI(TAG, "Active defrost finished (%s), count=%ld, duration=%lu s",
+             reason, static_cast<long>(defrost_count_), phase_timer_ms_ / 1000);
+
+    // Skip Defrost algorithm (MPXPRO d7/dn):
+    // Перші 7 defrosts — learning (не skip). Далі:
+    // Short defrost (< threshold% of max) → skip_counter++ (max 3)
+    // Long defrost → skip_counter = 0 (reset)
+    if (skip_enabled_ && termination_ == 0) {
+        warmup_count_++;
+        if (warmup_count_ > 7) {
+            uint32_t threshold_ms = (max_duration_ms_ * static_cast<uint32_t>(skip_threshold_pct_)) / 100;
+            if (phase_timer_ms_ < threshold_ms) {
+                // Short defrost → increment counter (max 3)
+                if (skip_counter_ < 3) skip_counter_++;
+                skip_remaining_ = skip_counter_;
+                ESP_LOGI(TAG, "Skip defrost: short (%.0f%% of max), counter=%ld, will skip %ld",
+                         100.0f * phase_timer_ms_ / max_duration_ms_,
+                         static_cast<long>(skip_counter_), static_cast<long>(skip_remaining_));
+            } else {
+                // Long defrost → reset
+                skip_counter_ = 0;
+                skip_remaining_ = 0;
+            }
+        }
+    }
 
     // Використовуємо active_defrost_type_ — кешований при старті циклу (BUG-002 fix)
     if (active_defrost_type_ == 2) {

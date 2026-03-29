@@ -40,6 +40,12 @@
       "description": "Що показувати на дисплеї під час відтайки",
       "optional": true
     },
+    "thermostat.night_active": {
+      "source_module": "thermostat",
+      "type": "bool",
+      "description": "Нічний режим активний (для Power Defrost)",
+      "optional": true
+    },
     "equipment.air_temp": {
       "source_module": "equipment",
       "type": "float",
@@ -346,6 +352,46 @@
       "persist": true,
       "description": "Час вирівнювання тиску (гарячий газ)"
     },
+    "defrost.skip_enabled": {
+      "type": "bool",
+      "access": "readwrite",
+      "default": false,
+      "persist": true,
+      "description": "Інтелектуальний пропуск відтайки"
+    },
+    "defrost.skip_threshold": {
+      "type": "int",
+      "unit": "%",
+      "access": "readwrite",
+      "min": 10,
+      "max": 100,
+      "step": 5,
+      "default": 75,
+      "persist": true,
+      "description": "Поріг короткої відтайки для пропуску"
+    },
+    "defrost.power_end_temp_delta": {
+      "type": "float",
+      "unit": "\u00b0C",
+      "access": "readwrite",
+      "min": 0,
+      "max": 20.0,
+      "step": 0.5,
+      "default": 0,
+      "persist": true,
+      "description": "Додаткова T завершення (нічний Power Defrost)"
+    },
+    "defrost.power_duration_delta": {
+      "type": "int",
+      "unit": "хв",
+      "access": "readwrite",
+      "min": 0,
+      "max": 60,
+      "step": 1,
+      "default": 0,
+      "persist": true,
+      "description": "Додатковий час (нічний Power Defrost)"
+    },
     "defrost.running_time": {
       "type": "int",
       "unit": "хв",
@@ -515,6 +561,23 @@
             "visible_when": {"key": "defrost.initiation", "eq": 4}
           },
           {
+            "key": "defrost.skip_enabled",
+            "widget": "toggle"
+          },
+          {
+            "key": "defrost.skip_threshold",
+            "widget": "number_input",
+            "visible_when": {"key": "defrost.skip_enabled", "eq": true}
+          },
+          {
+            "key": "defrost.power_end_temp_delta",
+            "widget": "number_input"
+          },
+          {
+            "key": "defrost.power_duration_delta",
+            "widget": "number_input"
+          },
+          {
             "key": "defrost.pump_down_time",
             "widget": "number_input"
           },
@@ -594,7 +657,11 @@
       "defrost.early_term_temp",
       "defrost.pump_down_time",
       "defrost.running_time",
-      "defrost.running_time_temp"
+      "defrost.running_time_temp",
+      "defrost.skip_enabled",
+      "defrost.skip_threshold",
+      "defrost.power_end_temp_delta",
+      "defrost.power_duration_delta"
     ]
   },
 
