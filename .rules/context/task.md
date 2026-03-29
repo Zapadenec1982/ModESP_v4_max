@@ -20,8 +20,8 @@
 
 ## Phase 2 — Smart Defrost
 
-- [ ] Pump Down (Phase::PUMP_DOWN, EEV=0% before defrost)
-- [ ] Running Time defrost (initiation mode 4)
+- [x] Pump Down (Phase::PUMP_DOWN, EEV close, comp ON before defrost)
+- [x] Running Time defrost (initiation mode 4, comp+T_evap counter)
 - [ ] Skip Defrost — MPXPRO algorithm (counter-based)
 - [ ] Power Defrost (enhanced night defrost)
 
