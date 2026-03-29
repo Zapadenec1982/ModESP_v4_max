@@ -11,8 +11,8 @@
 #include "esp_log.h"
 #include "driver/uart.h"
 
-// esp-modbus master API
-#include "esp_modbus_master.h"
+// esp-modbus API (managed component espressif__esp-modbus)
+#include "mbcontroller.h"
 
 static const char* TAG = "MBM";
 
@@ -21,26 +21,25 @@ namespace modesp {
 bool ModbusMasterService::init(int tx_gpio, int rx_gpio, int baudrate) {
     if (running_) return true;
 
-    // Конфігурація master на UART2
+    // Конфігурація master на UART2 (pattern з slave service)
     mb_communication_info_t comm = {};
     comm.ser_opts.port = UART_NUM_2;
     comm.ser_opts.mode = MB_RTU;
+    comm.ser_opts.uid = 0;  // dummy для master
     comm.ser_opts.baudrate = static_cast<uint32_t>(baudrate);
     comm.ser_opts.parity = UART_PARITY_EVEN;
     comm.ser_opts.data_bits = UART_DATA_8_BITS;
     comm.ser_opts.stop_bits = UART_STOP_BITS_1;
-    // Timeout для відповіді slave
     comm.ser_opts.response_tout_ms = 500;
 
     esp_err_t err = mbc_master_create_serial(&comm, &master_handle_);
-    if (err != ESP_OK) {
+    if (err != ESP_OK || !master_handle_) {
         ESP_LOGE(TAG, "mbc_master_create_serial failed: %s", esp_err_to_name(err));
         return false;
     }
 
-    // Налаштування GPIO для UART2
+    // Налаштування GPIO для UART2 (після create — UART driver вже ініціалізований)
     uart_set_pin(UART_NUM_2, tx_gpio, rx_gpio, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-    uart_set_mode(UART_NUM_2, UART_MODE_RS485_HALF_DUPLEX);
 
     err = mbc_master_start(master_handle_);
     if (err != ESP_OK) {
@@ -72,7 +71,7 @@ void ModbusMasterService::poll() {
     if (!running_ || !master_handle_) return;
 
     for (size_t i = 0; i < MAX_EXPANSION_SLAVES; i++) {
-        if (slaves_[i].type == 0) continue;  // disabled
+        if (slaves_[i].type == 0) continue;
         poll_slave(slaves_[i]);
     }
 }
@@ -92,6 +91,7 @@ void ModbusMasterService::poll_slave(ExpansionSlave& slave) {
         esp_err_t err = mbc_master_send_request(master_handle_, &req, buf);
         if (err == ESP_OK) {
             slave.online = true;
+            slave.errors = 0;
             slave.last_ok_ms = esp_log_timestamp();
             publish_inputs(slave, buf, count);
         } else {
@@ -107,7 +107,6 @@ void ModbusMasterService::poll_slave(ExpansionSlave& slave) {
 
 void ModbusMasterService::publish_inputs(const ExpansionSlave& slave,
                                           const uint16_t* data, size_t count) {
-    // Маппінг: expansion.s{addr}.input_{n} → SharedState
     auto& ss = SharedState::instance();
     char key[48];
 
@@ -181,7 +180,6 @@ size_t ModbusMasterService::slave_count() const {
 
 void ModbusMasterService::load_config() {
     // TODO: завантаження з NVS namespace "mbm"
-    // Формат: address|type|input_start|input_count|coil_start|coil_count для кожного slot
     ESP_LOGI(TAG, "Config loaded (placeholder)");
 }
 
@@ -192,8 +190,6 @@ void ModbusMasterService::save_config() {
 
 void ModbusMasterService::register_http_handlers(void* http_server) {
     // TODO: GET/POST /api/expansion
-    // GET: list slaves, status, online/offline
-    // POST: add/remove slave, write coil
     ESP_LOGI(TAG, "HTTP handlers registered (placeholder)");
 }
 

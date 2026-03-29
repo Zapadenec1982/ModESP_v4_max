@@ -4,6 +4,5 @@ idf_component_register(
     PRIV_REQUIRES
         modesp_core
         modesp_services
-        esp_modbus
         driver
 )

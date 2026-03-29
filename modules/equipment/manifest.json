@@ -214,6 +214,35 @@
           {"key": "equipment.ntc_r_nominal", "widget": "number_input", "label": "NTC R номінальний", "unit": "Ω",
            "visible_when": {"key": "equipment.has_ntc_driver", "eq": true}}
         ]
+      },
+      {
+        "title": "Резервування та зони",
+        "icon": "shield",
+        "icon_color": "green",
+        "subtitle": "Backup sensor, multi-zone, drift detection",
+        "collapsible": true,
+        "widgets": [
+          {"key": "equipment.air_temp_backup", "widget": "value", "label": "Backup T",
+           "visible_when": {"key": "equipment.has_backup_sensor", "eq": true}},
+          {"key": "equipment.probe_offset", "widget": "value", "label": "Auto offset (ro)",
+           "visible_when": {"key": "equipment.has_backup_sensor", "eq": true}},
+          {"key": "equipment.probe_failover_active", "widget": "indicator", "label": "Failover",
+           "on_label": "Активний", "off_label": "Ні", "on_color": "#f59e0b",
+           "visible_when": {"key": "equipment.has_backup_sensor", "eq": true}},
+          {"key": "equipment.sensor_drift_alarm", "widget": "indicator", "label": "Дрейф",
+           "on_label": "ТРИВОГА", "off_label": "Норма", "on_color": "#ef4444",
+           "visible_when": {"key": "equipment.has_backup_sensor", "eq": true}},
+          {"key": "equipment.sensor_diff_threshold", "widget": "number_input",
+           "visible_when": {"key": "equipment.has_backup_sensor", "eq": true}},
+          {"key": "equipment.probe_offset_decay", "widget": "number_input",
+           "visible_when": {"key": "equipment.has_backup_sensor", "eq": true}},
+          {"key": "equipment.zone_count", "widget": "value", "label": "Зон виміру"},
+          {"key": "equipment.zone_agg_mode", "widget": "select"},
+          {"key": "equipment.air_zone_1_temp", "widget": "value", "label": "Зона 1"},
+          {"key": "equipment.air_zone_2_temp", "widget": "value", "label": "Зона 2"},
+          {"key": "equipment.air_zone_3_temp", "widget": "value", "label": "Зона 3"},
+          {"key": "equipment.air_zone_4_temp", "widget": "value", "label": "Зона 4"}
+        ]
       }
     ]
   },

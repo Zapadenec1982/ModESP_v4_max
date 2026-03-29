@@ -352,6 +352,21 @@
           {"key": "eev.lop_pressure", "widget": "number_input", "label": "LOP тиск", "unit": "bar"},
           {"key": "eev.exercise_interval", "widget": "number_input", "label": "Розблокування", "unit": "год"}
         ]
+      },
+      {
+        "title": "Smooth Lines",
+        "icon": "trending-down",
+        "icon_color": "green",
+        "subtitle": "Динамічний SH setpoint по T камери",
+        "feature": "superheat_control",
+        "collapsible": true,
+        "widgets": [
+          {"key": "eev.smooth_lines", "widget": "toggle", "label": "Smooth Lines"},
+          {"key": "eev.smooth_max_offset", "widget": "number_input", "label": "Макс. зміщення SH",
+           "visible_when": {"key": "eev.smooth_lines", "eq": true}},
+          {"key": "eev.smooth_plt", "widget": "number_input", "label": "PLt (offset нижче SP)",
+           "visible_when": {"key": "eev.smooth_lines", "eq": true}}
+        ]
       }
     ]
   }

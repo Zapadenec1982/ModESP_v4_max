@@ -908,6 +908,26 @@
             "visible_when": {"key": "equipment.has_cond_temp", "eq": true}
           },
           {
+            "key": "protection.hp_limit",
+            "widget": "number_input",
+            "visible_when": {"key": "equipment.has_suction_p", "eq": true}
+          },
+          {
+            "key": "protection.hp_alarm_delay",
+            "widget": "number_input",
+            "visible_when": {"key": "equipment.has_suction_p", "eq": true}
+          },
+          {
+            "key": "protection.lp_limit",
+            "widget": "number_input",
+            "visible_when": {"key": "equipment.has_suction_p", "eq": true}
+          },
+          {
+            "key": "protection.lp_alarm_delay",
+            "widget": "number_input",
+            "visible_when": {"key": "equipment.has_suction_p", "eq": true}
+          },
+          {
             "key": "protection.door_comp_delay",
             "widget": "number_input",
             "visible_when": {"key": "equipment.has_door_contact", "eq": true}
@@ -915,6 +935,23 @@
           {
             "key": "protection.manual_reset",
             "widget": "toggle"
+          },
+          {
+            "key": "protection.haccp_delay",
+            "widget": "number_input",
+            "label": "HACCP затримка (0=вимк)"
+          },
+          {
+            "key": "protection.haccp_ha_alarm",
+            "widget": "indicator",
+            "label": "HACCP HA",
+            "on_label": "ТРИВОГА", "off_label": "Норма", "on_color": "#ef4444"
+          },
+          {
+            "key": "protection.haccp_hf_alarm",
+            "widget": "indicator",
+            "label": "HACCP HF",
+            "on_label": "ТРИВОГА", "off_label": "Норма", "on_color": "#ef4444"
           }
         ]
       },
