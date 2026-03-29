@@ -120,6 +120,11 @@ private:
     float    running_time_temp_   = -30.0f;   // Поріг T_evap для running time
     uint32_t running_time_counter_ms_ = 0;    // Runtime counter
 
+    // Defrost by ΔT (MPXPRO dd1/dd2/dTd/tdd) — initiation mode 5
+    float    delta_t_threshold_   = 10.0f;    // °C різниця air-evap для trigger
+    uint32_t delta_t_time_ms_     = 3600000;  // Час утримання ΔT для trigger (60 min default)
+    uint32_t delta_t_counter_ms_  = 0;        // Runtime counter
+
     // Skip Defrost (MPXPRO d7/dn) — counter-based algorithm
     bool     skip_enabled_        = false;
     int32_t  skip_threshold_pct_  = 75;       // % від max_duration: short defrost → skip

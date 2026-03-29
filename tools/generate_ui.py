@@ -1858,6 +1858,7 @@ class ModbusRegmapGenerator:
         "protection": 30151,   # 30151-30249 (alarms, diagnostics)
         "lighting":   30251,   # 30251-30279
         "datalogger": 30281,   # 30281-30299
+        "eev":        30301,   # 30301-30349 (superheat, valve, PI)
     }
     MODULE_HOLDING_BASE = {
         "equipment":  40001,   # 40001-40049 (NTC config, offsets)
@@ -1865,6 +1866,7 @@ class ModbusRegmapGenerator:
         "defrost":    40101,   # 40101-40149 (intervals, temps)
         "protection": 40151,   # 40151-40249 (limits, delays)
         "lighting":   40251,   # 40251-40279
+        "eev":        40301,   # 40301-40349 (SH target, PID params)
     }
 
     def generate(self, manifests):

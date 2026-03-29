@@ -109,7 +109,8 @@
         "1": {"requires_feature": "defrost_by_sensor", "disabled_hint": "Потрібен датчик випарника (evap_temp)"},
         "2": {"requires_feature": "defrost_by_sensor", "disabled_hint": "Потрібен датчик випарника (evap_temp)"},
         "3": {"always": true},
-        "4": {"requires_feature": "defrost_by_sensor", "disabled_hint": "Потрібен датчик випарника (evap_temp)"}
+        "4": {"requires_feature": "defrost_by_sensor", "disabled_hint": "Потрібен датчик випарника (evap_temp)"},
+        "5": {"requires_feature": "defrost_by_sensor", "disabled_hint": "Потрібен датчик випарника (evap_temp)"}
       }
     },
     "defrost.termination": {
@@ -238,7 +239,8 @@
         {"value": 1, "label": "За температурою випарника"},
         {"value": 2, "label": "Комбінований"},
         {"value": 3, "label": "Вимкнено"},
-        {"value": 4, "label": "За часом роботи (running time)"}
+        {"value": 4, "label": "За часом роботи (running time)"},
+        {"value": 5, "label": "За різницею температур (ΔT)"}
       ],
       "description": "Ініціація розморозки"
     },
@@ -351,6 +353,38 @@
       "default": 2,
       "persist": true,
       "description": "Час вирівнювання тиску (гарячий газ)"
+    },
+    "defrost.defrosts_per_day": {
+      "type": "int",
+      "access": "readwrite",
+      "min": 0,
+      "max": 14,
+      "step": 1,
+      "default": 0,
+      "persist": true,
+      "description": "Відтайок на добу (0=за інтервалом)"
+    },
+    "defrost.delta_t_threshold": {
+      "type": "float",
+      "unit": "\u00b0C",
+      "access": "readwrite",
+      "min": 2.0,
+      "max": 30.0,
+      "step": 0.5,
+      "default": 10.0,
+      "persist": true,
+      "description": "Поріг ΔT (повітря - випарник) для trigger"
+    },
+    "defrost.delta_t_time": {
+      "type": "int",
+      "unit": "хв",
+      "access": "readwrite",
+      "min": 15,
+      "max": 240,
+      "step": 5,
+      "default": 60,
+      "persist": true,
+      "description": "Час утримання ΔT для trigger"
     },
     "defrost.skip_enabled": {
       "type": "bool",
@@ -539,6 +573,20 @@
             "visible_when": {"key": "defrost.initiation", "in": [1, 2]}
           },
           {
+            "key": "defrost.defrosts_per_day",
+            "widget": "number_input"
+          },
+          {
+            "key": "defrost.delta_t_threshold",
+            "widget": "number_input",
+            "visible_when": {"key": "defrost.initiation", "eq": 5}
+          },
+          {
+            "key": "defrost.delta_t_time",
+            "widget": "number_input",
+            "visible_when": {"key": "defrost.initiation", "eq": 5}
+          },
+          {
             "key": "defrost.drip_time",
             "widget": "number_input"
           },
@@ -661,7 +709,10 @@
       "defrost.skip_enabled",
       "defrost.skip_threshold",
       "defrost.power_end_temp_delta",
-      "defrost.power_duration_delta"
+      "defrost.power_duration_delta",
+      "defrost.defrosts_per_day",
+      "defrost.delta_t_threshold",
+      "defrost.delta_t_time"
     ]
   },
 

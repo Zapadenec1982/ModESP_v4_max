@@ -55,12 +55,23 @@ void DefrostModule::sync_settings() {
     // Секунди → мілісекунди
     valve_delay_ms_ = static_cast<uint32_t>(read_int(ns_key("valve_delay"), 3)) * 1000;
 
+    // Staggered Defrost (MPXPRO d1S): auto N defrosts/day → override interval
+    int32_t defrosts_per_day = read_int(ns_key("defrosts_per_day"), 0);
+    if (defrosts_per_day > 0 && defrosts_per_day <= 14) {
+        // 24h / N = interval in ms
+        interval_ms_ = 86400000 / static_cast<uint32_t>(defrosts_per_day);
+    }
+
     // Pump Down (MPXPRO dH1) — секунди → мілісекунди
     pump_down_time_ms_ = static_cast<uint32_t>(read_int(ns_key("pump_down_time"), 0)) * 1000;
 
     // Running Time defrost (MPXPRO d10/d11) — хвилини → мілісекунди
     running_time_ms_   = static_cast<uint32_t>(read_int(ns_key("running_time"), 0)) * 60000;
     running_time_temp_ = read_float(ns_key("running_time_temp"), -30.0f);
+
+    // Defrost by ΔT (MPXPRO dd1/dd2/dTd/tdd)
+    delta_t_threshold_ = read_float(ns_key("delta_t_threshold"), 10.0f);
+    delta_t_time_ms_   = static_cast<uint32_t>(read_int(ns_key("delta_t_time"), 60)) * 60000;
 
     // Skip Defrost (MPXPRO d7/dn)
     skip_enabled_       = read_bool(ns_key("skip_enabled"), false);
@@ -365,11 +376,30 @@ void DefrostModule::update_idle(uint32_t dt_ms) {
         }
     }
 
+    // Defrost by ΔT trigger (mode 5): air_temp - evap_temp > threshold → counter++
+    bool delta_t_trigger = false;
+    if (initiation_ == 5 && delta_t_time_ms_ > 0) {
+        float air_temp = read_input_float("equipment.air_temp");
+        bool sensor1_ok = read_input_bool("equipment.sensor1_ok");
+        if (sensor1_ok && sensor2_ok_) {
+            float delta = air_temp - evap_temp_;
+            if (delta > delta_t_threshold_) {
+                delta_t_counter_ms_ += dt_ms;
+                if (delta_t_counter_ms_ >= delta_t_time_ms_) {
+                    delta_t_trigger = true;
+                    delta_t_counter_ms_ = 0;
+                }
+            } else {
+                delta_t_counter_ms_ = 0;
+            }
+        }
+    }
+
     // Перевіряємо triggers
     bool timer_trigger  = (initiation_ == 0 || initiation_ == 2) && check_timer_trigger();
     bool demand_trigger = (initiation_ == 1 || initiation_ == 2) && check_demand_trigger();
 
-    if (timer_trigger || demand_trigger || running_trigger) {
+    if (timer_trigger || demand_trigger || running_trigger || delta_t_trigger) {
         // Оптимізація: випарник чистий → скасовуємо (тільки в temp-mode)
         if (termination_ == 0 && sensor2_ok_ && evap_temp_ > end_temp_) {
             ESP_LOGI(TAG, "Defrost skipped — evap clean (%.1f > %.1f)",
@@ -386,7 +416,9 @@ void DefrostModule::update_idle(uint32_t dt_ms) {
             return;
         }
 
-        const char* reason = timer_trigger ? "timer" : (demand_trigger ? "demand" : "running_time");
+        const char* reason = timer_trigger ? "timer" :
+                             demand_trigger ? "demand" :
+                             running_trigger ? "running_time" : "delta_t";
         start_defrost(reason);
     }
 }
