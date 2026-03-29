@@ -32,7 +32,7 @@
 - [x] EEV Modbus Registers (superheat, valve_pos, PI @ 30301+/40301+)
 - [x] HACCP Events (HA: high T operation, HF: high T after blackout)
 - [x] Smooth Lines (dynamic SH setpoint by cabinet T, proportional)
-- [ ] RS-485 Modbus Master (I/O expansion bus) — окрема задача, новий component
+- [x] RS-485 Modbus Master (UART2, 8 slaves, poll+coil write, auto online/offline)
 
 ## Current state
 
