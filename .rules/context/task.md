@@ -30,9 +30,9 @@
 - [x] Staggered Defrost (defrosts_per_day → interval = 24h/N)
 - [x] Defrost by ΔT (initiation mode 5, air-evap > threshold × time)
 - [x] EEV Modbus Registers (superheat, valve_pos, PI @ 30301+/40301+)
-- [ ] HACCP Events (HA/HF types in DataLogger)
-- [ ] Smooth Lines (dynamic SH setpoint via EEV)
-- [ ] RS-485 Modbus Master (I/O expansion bus)
+- [x] HACCP Events (HA: high T operation, HF: high T after blackout)
+- [x] Smooth Lines (dynamic SH setpoint by cabinet T, proportional)
+- [ ] RS-485 Modbus Master (I/O expansion bus) — окрема задача, новий component
 
 ## Current state
 
