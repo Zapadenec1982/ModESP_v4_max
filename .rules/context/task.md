@@ -27,8 +27,11 @@
 
 ## Phase 3 — Extended
 
-- [ ] Staggered Defrost, Defrost by ΔT
-- [ ] EEV Modbus Registers, HACCP Events, Smooth Lines
+- [x] Staggered Defrost (defrosts_per_day → interval = 24h/N)
+- [x] Defrost by ΔT (initiation mode 5, air-evap > threshold × time)
+- [x] EEV Modbus Registers (superheat, valve_pos, PI @ 30301+/40301+)
+- [ ] HACCP Events (HA/HF types in DataLogger)
+- [ ] Smooth Lines (dynamic SH setpoint via EEV)
 - [ ] RS-485 Modbus Master (I/O expansion bus)
 
 ## Current state
