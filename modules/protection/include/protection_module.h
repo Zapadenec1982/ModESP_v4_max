@@ -135,6 +135,7 @@ private:
     // Логіка існуючих моніторів
     void update_high_temp(float temp, bool sensor_ok, bool defrost_active, uint32_t dt_ms);
     void update_low_temp(float temp, bool sensor_ok, bool suppress, uint32_t dt_ms);
+    void update_haccp(float temp, bool sensor_ok, uint32_t dt_ms);
     void update_sensor_alarm(AlarmMonitor& m, bool sensor_ok, const char* label);
     void update_door_alarm(bool door_open, uint32_t dt_ms);
     void update_condenser_alarm(float cond_temp, bool has_cond, uint32_t dt_ms);
@@ -204,6 +205,14 @@ private:
     // Continuous cycle suppression (low_temp + continuous_run)
     bool     cc_suppress_active_       = false;    // suppress під час та після CC
     uint32_t cc_bypass_remaining_ms_   = 0;        // bypass timer після CC
+
+    // HACCP alarms (HA: high temp during operation, HF: high temp after blackout)
+    AlarmMonitor haccp_ha_;                         // HA alarm
+    bool     haccp_hf_active_          = false;     // HF alarm (one-shot after power-on)
+    bool     haccp_hf_checked_         = false;     // HF check done (only once after boot)
+    int32_t  haccp_delay_min_          = 0;         // Htd: додаткова затримка HACCP (0=disabled)
+    int32_t  haccp_ha_count_           = 0;         // Лічильник HA алармів
+    int32_t  haccp_hf_count_           = 0;         // Лічильник HF алармів
 
     // Кешований код аварії
     const char* alarm_code_ = "none";

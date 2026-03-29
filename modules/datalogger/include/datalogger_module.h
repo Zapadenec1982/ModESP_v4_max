@@ -66,6 +66,9 @@ enum EventType : uint8_t {
     EVENT_ALARM_RAPID_CYC = 16,
     EVENT_ALARM_RATE_RISE = 17,
     EVENT_ALARM_DOOR      = 18,
+    // HACCP (Hazard Analysis Critical Control Point)
+    EVENT_HACCP_HA        = 19,   // High temp during operation (Ad + Htd delay)
+    EVENT_HACCP_HF        = 20,   // High temp after power failure (blackout)
 };
 
 /// Запис події (8 bytes, aligned)
@@ -122,6 +125,8 @@ private:
     bool prev_rapid_cyc_alarm_= false;
     bool prev_rate_alarm_     = false;
     bool prev_door_alarm_     = false;
+    bool prev_haccp_ha_       = false;
+    bool prev_haccp_hf_       = false;
 
     // ── Таймери ──
     uint32_t sample_timer_ms_ = 0;

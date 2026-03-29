@@ -300,8 +300,62 @@ void ProtectionModule::on_update(uint32_t dt_ms) {
         }
     }
 
-    // 6. Публікуємо стан аварій
+    // 8. HACCP alarms (HA: high temp during operation, HF: high temp after blackout)
+    update_haccp(air_temp, sensor1_ok, dt_ms);
+
+    // 9. Публікуємо стан аварій
     publish_alarms();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HACCP: HA (high temp during operation) та HF (high temp after blackout)
+// ═══════════════════════════════════════════════════════════════
+
+void ProtectionModule::update_haccp(float temp, bool sensor_ok, uint32_t dt_ms) {
+    haccp_delay_min_ = read_int(ns_key("haccp_delay"), 0);
+    if (haccp_delay_min_ == 0) return;  // HACCP disabled
+
+    uint32_t haccp_delay_ms = static_cast<uint32_t>(haccp_delay_min_) * 60000;
+
+    // HA: high temp during operation — додаткова затримка після high_temp alarm
+    if (high_temp_.active && sensor_ok) {
+        haccp_ha_.pending = true;
+        haccp_ha_.pending_ms += dt_ms;
+        if (!haccp_ha_.active && haccp_ha_.pending_ms >= haccp_delay_ms) {
+            haccp_ha_.active = true;
+            haccp_ha_count_++;
+            state_set(ns_key("haccp_ha_alarm"), true);
+            state_set(ns_key("haccp_ha_count"), haccp_ha_count_);
+            ESP_LOGW(TAG, "HACCP HA ALARM: high temp for %ld min beyond threshold",
+                     static_cast<long>(haccp_delay_min_));
+        }
+    } else {
+        haccp_ha_.pending = false;
+        haccp_ha_.pending_ms = 0;
+        if (haccp_ha_.active) {
+            haccp_ha_.active = false;
+            state_set(ns_key("haccp_ha_alarm"), false);
+        }
+    }
+
+    // HF: high temp after power failure — одноразова перевірка при старті
+    if (!haccp_hf_checked_ && sensor_ok) {
+        haccp_hf_checked_ = true;
+        if (temp > high_limit_) {
+            haccp_hf_active_ = true;
+            haccp_hf_count_++;
+            state_set(ns_key("haccp_hf_alarm"), true);
+            state_set(ns_key("haccp_hf_count"), haccp_hf_count_);
+            ESP_LOGW(TAG, "HACCP HF ALARM: high temp %.1f°C after power failure (limit %.1f°C)",
+                     temp, high_limit_);
+        }
+    }
+    // HF clears коли temp повертається в норму
+    if (haccp_hf_active_ && sensor_ok && temp <= high_limit_) {
+        haccp_hf_active_ = false;
+        state_set(ns_key("haccp_hf_alarm"), false);
+        ESP_LOGI(TAG, "HACCP HF cleared — temp %.1f°C <= %.1f°C", temp, high_limit_);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -308,6 +308,17 @@ void DataLoggerModule::poll_events() {
     if (da && !prev_door_alarm_) log_event(EVENT_ALARM_DOOR);
     if (!da && prev_door_alarm_) log_event(EVENT_ALARM_CLEAR);
     prev_door_alarm_ = da;
+
+    // HACCP alarms
+    bool ha = read_input_bool("protection.haccp_ha_alarm", false);
+    if (ha && !prev_haccp_ha_) log_event(EVENT_HACCP_HA);
+    if (!ha && prev_haccp_ha_) log_event(EVENT_ALARM_CLEAR);
+    prev_haccp_ha_ = ha;
+
+    bool hf = read_input_bool("protection.haccp_hf_alarm", false);
+    if (hf && !prev_haccp_hf_) log_event(EVENT_HACCP_HF);
+    if (!hf && prev_haccp_hf_) log_event(EVENT_ALARM_CLEAR);
+    prev_haccp_hf_ = hf;
 }
 
 // ── Запис події в RAM буфер ──

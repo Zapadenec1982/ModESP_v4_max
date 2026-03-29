@@ -204,6 +204,37 @@
       "access": "read",
       "description": "Двері відкриті занадто довго"
     },
+    "protection.haccp_ha_alarm": {
+      "type": "bool",
+      "access": "read",
+      "description": "HACCP HA: висока T при роботі"
+    },
+    "protection.haccp_hf_alarm": {
+      "type": "bool",
+      "access": "read",
+      "description": "HACCP HF: висока T після збою живлення"
+    },
+    "protection.haccp_ha_count": {
+      "type": "int",
+      "access": "read",
+      "description": "Кількість HACCP HA алармів"
+    },
+    "protection.haccp_hf_count": {
+      "type": "int",
+      "access": "read",
+      "description": "Кількість HACCP HF алармів"
+    },
+    "protection.haccp_delay": {
+      "type": "int",
+      "unit": "хв",
+      "access": "readwrite",
+      "min": 0,
+      "max": 240,
+      "step": 5,
+      "default": 0,
+      "persist": true,
+      "description": "HACCP затримка (0=вимкнено)"
+    },
     "protection.short_cycle_alarm": {
       "type": "bool",
       "access": "read",
@@ -550,6 +581,10 @@
       "protection.sensor1_alarm",
       "protection.sensor2_alarm",
       "protection.door_alarm",
+      "protection.haccp_ha_alarm",
+      "protection.haccp_hf_alarm",
+      "protection.haccp_ha_count",
+      "protection.haccp_hf_count",
       "protection.short_cycle_alarm",
       "protection.rapid_cycle_alarm",
       "protection.continuous_run_alarm",
@@ -575,6 +610,7 @@
       "protection.door_delay",
       "protection.manual_reset",
       "protection.post_defrost_delay",
+      "protection.haccp_delay",
       "protection.reset_alarms",
       "protection.min_compressor_run",
       "protection.max_starts_hour",
