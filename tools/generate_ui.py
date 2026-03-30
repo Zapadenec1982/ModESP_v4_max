@@ -1472,10 +1472,14 @@ class UIJsonGenerator:
 
             # Zone metadata: _z2 roles need active_zones >= 2
             role_name = req["role"]
+            # Zone-specific roles: show only when multi-zone active
+            # _z1 roles also need zone_min=2 because in single-zone mode
+            # the global role (air_temp, evap_temp) is used instead
             zone_min = 0  # global
             if "_z4" in role_name: zone_min = 4
             elif "_z3" in role_name: zone_min = 3
             elif "_z2" in role_name: zone_min = 2
+            elif "_z1" in role_name: zone_min = 2
 
             role_entry = {
                 "role": role_name,

@@ -18,7 +18,6 @@
     {"role": "discharge_p",   "type": "sensor",   "driver": ["pressure_adc"],          "label": "Тиск нагнітання",      "optional": true},
     {"role": "eev",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "eev_pcf8574_stepper", "akv_pulse"], "label": "Клапан EEV", "optional": true},
 
-    {"role": "air_temp_z1",      "type": "sensor",   "driver": ["ds18b20", "ntc"],          "label": "Темп. камери зона 1",        "optional": true},
     {"role": "air_temp_z2",      "type": "sensor",   "driver": ["ds18b20", "ntc"],          "label": "Темп. камери зона 2",        "optional": true},
     {"role": "evap_temp_z1",     "type": "sensor",   "driver": ["ds18b20", "ntc"],          "label": "Темп. випарника зона 1",     "optional": true},
     {"role": "evap_temp_z2",     "type": "sensor",   "driver": ["ds18b20", "ntc"],          "label": "Темп. випарника зона 2",     "optional": true},
@@ -72,9 +71,7 @@
                                   "description": "Тип холодоагенту (0=R134a, 1=R404A, ...)"},
     "equipment.has_ds18b20_driver": {"type": "bool", "access": "read", "description": "Використовується DS18B20 драйвер"},
 
-    "equipment.air_temp_z1":          {"type": "float", "unit": "°C", "access": "read", "description": "Темп. камери зона 1"},
     "equipment.air_temp_z2":          {"type": "float", "unit": "°C", "access": "read", "description": "Темп. камери зона 2"},
-    "equipment.sensor1_z1_ok":        {"type": "bool", "access": "read", "description": "Датчик камери зона 1 справний"},
     "equipment.sensor1_z2_ok":        {"type": "bool", "access": "read", "description": "Датчик камери зона 2 справний"},
     "equipment.evap_temp_z1":         {"type": "float", "unit": "°C", "access": "read", "description": "Темп. випарника зона 1"},
     "equipment.evap_temp_z2":         {"type": "float", "unit": "°C", "access": "read", "description": "Темп. випарника зона 2"},

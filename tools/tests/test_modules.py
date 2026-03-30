@@ -121,7 +121,7 @@ class TestEquipmentManifest:
 
     def test_has_24_state_keys(self, equipment):
         """Equipment має 24 state keys."""
-        assert len(equipment["state"]) == 68
+        assert len(equipment["state"]) == 66
 
     def test_sensor_keys_readonly(self, equipment):
         """Sensor/actuator state keys — read-only, settings — readwrite."""
@@ -540,9 +540,9 @@ class TestCrossModuleValidation:
         assert len(therm_errors) == 0, f"Thermostat errors: {therm_errors}"
 
     def test_total_state_keys(self, all_manifests):
-        """Всього 233 state keys у 7 модулях."""
+        """Всього 231 state keys у 7 модулях."""
         total = sum(len(m.get("state", {})) for m in all_manifests)
-        assert total == 233
+        assert total == 231
 
 
 # ═══════════════════════════════════════════════════════════════

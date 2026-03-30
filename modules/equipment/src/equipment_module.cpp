@@ -292,7 +292,7 @@ void EquipmentModule::read_sensors() {
     int coeff = read_int(ns_key("filter_coeff"), 4);
     float alpha = (coeff > 0) ? 1.0f / (coeff + 1) : 1.0f;
 
-    // Датчик камери (обов'язковий)
+    // Датчик камери (зона 1 = основна, завжди)
     if (sensor_air_) {
         float temp = 0.0f;
         if (sensor_air_->read(temp)) {
@@ -305,12 +305,6 @@ void EquipmentModule::read_sensors() {
             state_set(ns_key("air_temp"), NAN);
         }
         state_set(ns_key("sensor1_ok"), sensor_air_->is_healthy());
-
-        // Fallback: якщо per-zone air sensor НЕ підключений — дублюємо global як zone 1
-        if (zone_count_ >= 1 && !zones_[0].air_sensor) {
-            state_set("equipment.air_temp_z1", air_temp_);
-            state_set("equipment.sensor1_z1_ok", sensor_air_->is_healthy());
-        }
     }
 
     // Датчик випарника (опціональний)
