@@ -279,9 +279,15 @@ esp_err_t HttpService::handle_get_state(httpd_req_t* req) {
 }
 
 esp_err_t HttpService::handle_get_board(httpd_req_t* req) {
-    char buf[1024];
-    int len = read_file_to_buf("/data/board.json", buf, sizeof(buf));
+    // Heap allocation — board.json може бути до 4KB з extended hardware config
+    char* buf = static_cast<char*>(malloc(4096));
+    if (!buf) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
+        return ESP_FAIL;
+    }
+    int len = read_file_to_buf("/data/board.json", buf, 4096);
     if (len < 0) {
+        free(buf);
         httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "board.json not found");
         return ESP_FAIL;
     }
@@ -289,6 +295,7 @@ esp_err_t HttpService::handle_get_board(httpd_req_t* req) {
     set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, buf, len);
+    free(buf);
     return ESP_OK;
 }
 
