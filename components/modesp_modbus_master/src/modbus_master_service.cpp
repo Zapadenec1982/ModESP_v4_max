@@ -107,7 +107,7 @@ void ModbusMasterService::poll_slave(ExpansionSlave& slave) {
 
 void ModbusMasterService::publish_inputs(const ExpansionSlave& slave,
                                           const uint16_t* data, size_t count) {
-    auto& ss = SharedState::instance();
+    if (!state_) return;
     char key[48];
 
     for (size_t i = 0; i < count; i++) {
@@ -115,11 +115,11 @@ void ModbusMasterService::publish_inputs(const ExpansionSlave& slave,
                  slave.address, static_cast<int>(i));
         // Scale: int16 × 0.1 → float (standard Modbus convention)
         float val = static_cast<int16_t>(data[i]) / 10.0f;
-        ss.set(key, val);
+        state_->set(key, val);
     }
 
     snprintf(key, sizeof(key), "expansion.s%d.online", slave.address);
-    ss.set(key, slave.online);
+    state_->set(key, slave.online);
 }
 
 bool ModbusMasterService::write_coil(uint8_t slave_addr, uint16_t coil_addr, bool value) {

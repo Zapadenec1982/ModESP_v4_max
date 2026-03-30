@@ -63,6 +63,9 @@ public:
     /// Записати coil (relay) на slave
     bool write_coil(uint8_t slave_addr, uint16_t coil_addr, bool value);
 
+    /// SharedState pointer (set before init)
+    void set_state(SharedState* s) { state_ = s; }
+
     /// Статус
     bool is_running() const { return running_; }
     size_t slave_count() const;
@@ -70,6 +73,7 @@ public:
 private:
     void* master_handle_ = nullptr;
     bool  running_ = false;
+    SharedState* state_ = nullptr;
 
     ExpansionSlave slaves_[MAX_EXPANSION_SLAVES] = {};
 
