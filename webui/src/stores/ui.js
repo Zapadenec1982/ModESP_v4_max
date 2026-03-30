@@ -5,6 +5,13 @@ import { language } from './i18n.js';
 /** Full UI config from /api/ui */
 export const uiConfig = writable(null);
 
+/** Access level: 'basic' | 'service' | 'expert' */
+const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('accessLevel') : null;
+export const accessLevel = writable(stored || 'basic');
+accessLevel.subscribe(v => {
+  if (typeof localStorage !== 'undefined') localStorage.setItem('accessLevel', v);
+});
+
 /** Raw pages from server (always Ukrainian) */
 const rawPages = derived(uiConfig, $ui => $ui?.pages || []);
 

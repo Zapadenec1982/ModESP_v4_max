@@ -1,9 +1,18 @@
 <script>
   import { fly } from "svelte/transition";
   import { onDestroy } from "svelte";
-  import { pages } from "../stores/ui.js";
+  import { pages, accessLevel } from "../stores/ui.js";
   import { state } from "../stores/state.js";
   import { t } from "../stores/i18n.js";
+
+  // Access level hierarchy: basic < service < expert
+  const levelOrder = { basic: 0, service: 1, expert: 2 };
+  function cardAllowed(card) {
+    const cardLevel = card.group || 'basic';
+    // Map old "settings" group to "service"
+    const mapped = cardLevel === 'settings' ? 'service' : cardLevel;
+    return (levelOrder[mapped] || 0) <= (levelOrder[$accessLevel] || 0);
+  }
   import { isVisible } from "../lib/visibility.js";
   import GroupAccordion from "../components/GroupAccordion.svelte";
   import WidgetRenderer from "../components/WidgetRenderer.svelte";
@@ -54,7 +63,7 @@
       visible: isVisible(card.visible_when, $state),
       widgetCount: card.widgets.filter(w => isVisible(w.visible_when, $state)).length,
     }))
-    .filter(c => !c.isAlarmCard && !c.isDiagCard && c.visible)
+    .filter(c => !c.isAlarmCard && !c.isDiagCard && c.visible && cardAllowed(c.card))
     .sort((a, b) => {
       // Явно wide картки зберігають позицію; auto-wide (>7 widgets) — після коротких
       const aFull = !a.card.wide && a.widgetCount > FULL_WIDTH_THRESHOLD ? 1 : 0;
@@ -102,6 +111,22 @@
 
 {#if page}
   <div class="page-grid page-padding">
+    <!-- Access Level Selector -->
+    <div class="level-selector">
+      <button class="lvl-btn" class:active={$accessLevel === 'basic'}
+        on:click={() => $accessLevel = 'basic'}>
+        {$t['ui.level.basic'] || 'Основне'}
+      </button>
+      <button class="lvl-btn" class:active={$accessLevel === 'service'}
+        on:click={() => $accessLevel = 'service'}>
+        {$t['ui.level.service'] || 'Сервіс'}
+      </button>
+      <button class="lvl-btn" class:active={$accessLevel === 'expert'}
+        on:click={() => $accessLevel = 'expert'}>
+        {$t['ui.level.expert'] || 'Експерт'}
+      </button>
+    </div>
+
     {#if isProtection}
       <!-- Protection Status Hero -->
       {#if alarmActive}
@@ -279,6 +304,36 @@
 {/if}
 
 <style>
+  .level-selector {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    background: var(--card-bg, #1e293b);
+    border-radius: 8px;
+    padding: 3px;
+    grid-column: 1 / -1;
+  }
+  .lvl-btn {
+    flex: 1;
+    padding: 6px 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary, #94a3b8);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .lvl-btn.active {
+    background: var(--accent, #3b82f6);
+    color: #fff;
+  }
+  .lvl-btn:hover:not(.active) {
+    background: var(--card-hover, #334155);
+    color: var(--text-primary, #e2e8f0);
+  }
+
   .page-grid {
     max-width: 640px;
     margin: 0 auto;
