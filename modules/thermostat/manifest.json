@@ -488,7 +488,7 @@
         "icon_color": "cyan",
         "subtitle": "Режим вентиляторів",
         "summary_keys": ["thermostat.evap_fan_mode"],
-        "group": "settings",
+        "group": "service",
         "collapsible": true,
         "widgets": [
           {
@@ -518,7 +518,7 @@
         "icon_color": "orange",
         "subtitle": "Зміщення уставки вночі",
         "summary_keys": ["thermostat.night_mode"],
-        "group": "settings",
+        "group": "service",
         "collapsible": true,
         "widgets": [
           {

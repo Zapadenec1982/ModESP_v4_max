@@ -866,9 +866,9 @@
         "title": "Налаштування захисту",
         "icon": "sliders",
         "icon_color": "cyan",
-        "subtitle": "Межі, затримки",
+        "subtitle": "Межі, затримки, HACCP",
         "summary_keys": ["protection.high_limit", "protection.low_limit"],
-        "group": "settings",
+        "group": "service",
         "collapsible": true,
         "wide": true,
         "widgets": [
@@ -961,7 +961,7 @@
         "icon_color": "orange",
         "subtitle": "Таймінги, циклічність, моніторинг",
         "summary_keys": ["thermostat.min_off_time", "protection.max_starts_hour"],
-        "group": "settings",
+        "group": "expert",
         "collapsible": true,
         "widgets": [
           {

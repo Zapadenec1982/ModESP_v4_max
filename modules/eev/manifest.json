@@ -302,55 +302,65 @@
     "icon": "thermometer",
     "cards": [
       {
-        "title": "Клапан",
-        "icon": "settings",
-        "subtitle": "Тип та параметри клапана",
-        "columns": 2,
-        "widgets": [
-          {"key": "eev.valve_type", "widget": "select", "label": "Тип клапана"},
-          {"key": "eev.max_steps", "widget": "number_input", "label": "Макс. кроків", "visible_when": {"key": "eev.valve_type", "neq": 0}}
-        ]
-      },
-      {
-        "title": "Перегрів",
+        "title": "Стан",
         "icon": "thermometer",
-        "columns": 2,
+        "icon_color": "blue",
+        "subtitle": "Перегрів, клапан, стан",
+        "summary_keys": ["eev.superheat", "eev.valve_pos"],
+        "wide": true,
         "widgets": [
           {"key": "eev.superheat", "widget": "gauge", "label": "Перегрів", "unit": "K", "min": -5, "max": 30},
           {"key": "eev.t_sat", "widget": "value", "label": "T насичення", "unit": "°C"},
           {"key": "eev.valve_pos", "widget": "gauge", "label": "Клапан", "unit": "%", "min": 0, "max": 100},
-          {"key": "eev.state", "widget": "status_text", "label": "Стан"},
-          {"key": "eev.pi_output", "widget": "value", "label": "PI вихід"}
+          {"key": "eev.state", "widget": "status_text", "label": "Стан"}
+        ]
+      },
+      {
+        "title": "Основне",
+        "icon": "sliders",
+        "icon_color": "green",
+        "subtitle": "Тип клапана, цільовий перегрів",
+        "summary_keys": ["eev.sh_target", "eev.valve_type"],
+        "widgets": [
+          {"key": "eev.valve_type", "widget": "select", "label": "Тип клапана"},
+          {"key": "eev.max_steps", "widget": "number_input", "label": "Макс. кроків", "visible_when": {"key": "eev.valve_type", "neq": 0}},
+          {"key": "eev.sh_target", "widget": "number_input", "label": "Цільовий перегрів", "unit": "K"}
+        ]
+      },
+      {
+        "title": "Захист",
+        "icon": "shield",
+        "icon_color": "orange",
+        "subtitle": "MOP, LOP, мін. перегрів",
+        "group": "service",
+        "collapsible": true,
+        "feature": "superheat_control",
+        "widgets": [
+          {"key": "eev.low_sh_limit", "widget": "number_input", "label": "Мін. перегрів", "unit": "K"},
+          {"key": "eev.mop_pressure", "widget": "number_input", "label": "MOP тиск", "unit": "bar"},
+          {"key": "eev.lop_pressure", "widget": "number_input", "label": "LOP тиск", "unit": "bar"},
+          {"key": "eev.exercise_interval", "widget": "number_input", "label": "Розблокування клапана", "unit": "год"}
         ]
       },
       {
         "title": "Налаштування PI",
         "icon": "settings",
-        "columns": 2,
+        "icon_color": "gray",
+        "subtitle": "Kp, Ki, інтервал, позиції",
+        "group": "expert",
+        "collapsible": true,
         "feature": "superheat_control",
         "widgets": [
-          {"key": "eev.sh_target", "widget": "number_input", "label": "Цільовий перегрів", "unit": "K"},
+          {"key": "eev.kp", "widget": "number_input", "label": "Kp (пропорційна)"},
+          {"key": "eev.ki", "widget": "number_input", "label": "Ki (інтегральна)"},
           {"key": "eev.deadband", "widget": "number_input", "label": "Зона нечутливості", "unit": "K"},
-          {"key": "eev.kp", "widget": "number_input", "label": "Kp"},
-          {"key": "eev.ki", "widget": "number_input", "label": "Ki"},
           {"key": "eev.pi_interval", "widget": "number_input", "label": "Інтервал PI", "unit": "с"},
           {"key": "eev.startup_pos", "widget": "number_input", "label": "Стартова позиція", "unit": "%"},
-          {"key": "eev.startup_wait", "widget": "number_input", "label": "Затримка старту", "unit": "с"}
-        ]
-      },
-      {
-        "title": "Безпека",
-        "icon": "shield",
-        "columns": 2,
-        "feature": "superheat_control",
-        "widgets": [
+          {"key": "eev.startup_wait", "widget": "number_input", "label": "Затримка старту", "unit": "с"},
           {"key": "eev.min_pos", "widget": "number_input", "label": "Мін. позиція", "unit": "%"},
           {"key": "eev.max_pos", "widget": "number_input", "label": "Макс. позиція", "unit": "%"},
           {"key": "eev.safe_pos", "widget": "number_input", "label": "Безпечна позиція", "unit": "%"},
-          {"key": "eev.low_sh_limit", "widget": "number_input", "label": "Мін. перегрів", "unit": "K"},
-          {"key": "eev.mop_pressure", "widget": "number_input", "label": "MOP тиск", "unit": "bar"},
-          {"key": "eev.lop_pressure", "widget": "number_input", "label": "LOP тиск", "unit": "bar"},
-          {"key": "eev.exercise_interval", "widget": "number_input", "label": "Розблокування", "unit": "год"}
+          {"key": "eev.pi_output", "widget": "value", "label": "PI вихід (діагностика)"}
         ]
       },
       {
@@ -358,8 +368,9 @@
         "icon": "trending-down",
         "icon_color": "green",
         "subtitle": "Динамічний SH setpoint по T камери",
-        "feature": "superheat_control",
+        "group": "expert",
         "collapsible": true,
+        "feature": "superheat_control",
         "widgets": [
           {"key": "eev.smooth_lines", "widget": "toggle", "label": "Smooth Lines"},
           {"key": "eev.smooth_max_offset", "widget": "number_input", "label": "Макс. зміщення SH",

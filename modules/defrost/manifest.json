@@ -535,7 +535,7 @@
         "icon_color": "orange",
         "subtitle": "Тип, інтервал, тривалість",
         "summary_keys": ["defrost.type", "defrost.interval"],
-        "group": "settings",
+        "group": "service",
         "collapsible": true,
         "widgets": [
           {
@@ -650,7 +650,7 @@
         "icon_color": "red",
         "subtitle": "Фази, стабілізація",
         "summary_keys": ["defrost.stabilize_time"],
-        "group": "settings",
+        "group": "service",
         "collapsible": true,
         "visible_when": {"key": "defrost.type", "eq": 2},
         "widgets": [

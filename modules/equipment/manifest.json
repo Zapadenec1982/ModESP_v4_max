@@ -220,6 +220,7 @@
         "icon": "shield",
         "icon_color": "green",
         "subtitle": "Backup sensor, multi-zone, drift detection",
+        "group": "service",
         "collapsible": true,
         "widgets": [
           {"key": "equipment.air_temp_backup", "widget": "value", "label": "Backup T",
