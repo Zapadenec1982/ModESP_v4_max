@@ -329,16 +329,26 @@ esp_err_t HttpService::handle_get_ui(httpd_req_t* req) {
 }
 
 esp_err_t HttpService::handle_get_bindings(httpd_req_t* req) {
-    char buf[1024];
-    int len = read_file_to_buf("/data/bindings.json", buf, sizeof(buf));
-    if (len < 0) {
+    FILE* f = fopen("/data/bindings.json", "r");
+    if (!f) {
         httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "bindings.json not found");
         return ESP_FAIL;
     }
 
     set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, buf, len);
+
+    char buf[512];
+    size_t read_bytes;
+    while ((read_bytes = fread(buf, 1, sizeof(buf), f)) > 0) {
+        if (httpd_resp_send_chunk(req, buf, read_bytes) != ESP_OK) {
+            fclose(f);
+            httpd_resp_send_chunk(req, nullptr, 0);
+            return ESP_FAIL;
+        }
+    }
+    fclose(f);
+    httpd_resp_send_chunk(req, nullptr, 0);
     return ESP_OK;
 }
 
