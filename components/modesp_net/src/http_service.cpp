@@ -279,7 +279,7 @@ esp_err_t HttpService::handle_get_state(httpd_req_t* req) {
 }
 
 esp_err_t HttpService::handle_get_board(httpd_req_t* req) {
-    char buf[4096];
+    char buf[3072];  // board.json ~2.9KB
     int len = read_file_to_buf("/data/board.json", buf, sizeof(buf));
     if (len < 0) {
         httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "board.json not found");
@@ -333,8 +333,8 @@ esp_err_t HttpService::handle_get_bindings(httpd_req_t* req) {
 
 esp_err_t HttpService::handle_post_bindings(httpd_req_t* req) {
     if (!check_auth(req)) return ESP_OK;
-    // Приймаємо JSON body — bindings.json зазвичай < 512 байт
-    char buf[1024];
+    // Приймаємо JSON body — bindings.json до ~2KB з 11+ bindings
+    char buf[2048];
     int total = 0;
     int remaining = req->content_len;
     if (remaining <= 0 || remaining >= (int)sizeof(buf)) {
