@@ -116,9 +116,9 @@ static ProtectionModule        protection;
 
 // ── Zone 1 InputBindings ──
 static constexpr modesp::InputBinding z1_thermo_inputs[] = {
-    {"equipment.air_temp",     "equipment.air_temp"},      // shared sensor
+    {"equipment.air_temp",     "equipment.air_temp_z1"},   // per-zone (fallback: global air_temp)
     {"equipment.evap_temp",    "equipment.evap_temp_z1"},  // per-zone
-    {"equipment.sensor1_ok",   "equipment.sensor1_ok"},    // shared
+    {"equipment.sensor1_ok",   "equipment.sensor1_z1_ok"}, // per-zone
     {"equipment.sensor2_ok",   "equipment.sensor2_z1_ok"}, // per-zone
     {"equipment.compressor",   "equipment.compressor"},    // shared
     {"equipment.night_input",  "equipment.night_input"},   // shared
@@ -144,9 +144,9 @@ static constexpr modesp::InputBinding z1_eev_inputs[] = {
 // ── Zone 2 InputBindings (includes zone_enabled check) ──
 static constexpr modesp::InputBinding z2_thermo_inputs[] = {
     {"equipment.zone_enabled", "equipment.zone2_enabled"},  // runtime enable
-    {"equipment.air_temp",     "equipment.air_temp"},
+    {"equipment.air_temp",     "equipment.air_temp_z2"},   // per-zone air temp
     {"equipment.evap_temp",    "equipment.evap_temp_z2"},
-    {"equipment.sensor1_ok",   "equipment.sensor1_ok"},
+    {"equipment.sensor1_ok",   "equipment.sensor1_z2_ok"}, // per-zone
     {"equipment.sensor2_ok",   "equipment.sensor2_z2_ok"},
     {"equipment.compressor",   "equipment.compressor"},
     {"equipment.night_input",  "equipment.night_input"},

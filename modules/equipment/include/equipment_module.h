@@ -145,8 +145,11 @@ private:
         float eev_valve_pos    = 0.0f;
 
         // Per-zone hardware (bound in bind_drivers, used when zone_count >= 2)
+        modesp::ISensorDriver*   air_sensor      = nullptr;  // per-zone air temp
         modesp::ISensorDriver*   evap_sensor     = nullptr;
         modesp::ISensorDriver*   pressure_sensor = nullptr;
+        float ema_air_z = 0.0f;
+        bool  ema_air_z_init = false;
         modesp::IActuatorDriver* defrost_relay   = nullptr;
         modesp::IActuatorDriver* evap_fan        = nullptr;
         modesp::IActuatorDriver* eev_driver      = nullptr;

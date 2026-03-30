@@ -92,12 +92,14 @@ void EquipmentModule::bind_drivers(modesp::DriverManager& dm) {
 
     // Per-zone driver binding (when zone_count_ >= 2)
     if (zone_count_ >= 2) {
+        zones_[0].air_sensor      = dm.find_sensor("air_temp_z1");
         zones_[0].evap_sensor     = dm.find_sensor("evap_temp_z1");
         zones_[0].pressure_sensor = dm.find_sensor("suction_p_z1");
         zones_[0].defrost_relay   = dm.find_actuator("defrost_relay_z1");
         zones_[0].evap_fan        = dm.find_actuator("evap_fan_z1");
         zones_[0].eev_driver      = dm.find_actuator("eev_z1");
 
+        zones_[1].air_sensor      = dm.find_sensor("air_temp_z2");
         zones_[1].evap_sensor     = dm.find_sensor("evap_temp_z2");
         zones_[1].pressure_sensor = dm.find_sensor("suction_p_z2");
         zones_[1].defrost_relay   = dm.find_actuator("defrost_relay_z2");
@@ -303,6 +305,12 @@ void EquipmentModule::read_sensors() {
             state_set(ns_key("air_temp"), NAN);
         }
         state_set(ns_key("sensor1_ok"), sensor_air_->is_healthy());
+
+        // Fallback: якщо per-zone air sensor НЕ підключений — дублюємо global як zone 1
+        if (zone_count_ >= 1 && !zones_[0].air_sensor) {
+            state_set("equipment.air_temp_z1", air_temp_);
+            state_set("equipment.sensor1_z1_ok", sensor_air_->is_healthy());
+        }
     }
 
     // Датчик випарника (опціональний)
@@ -354,6 +362,18 @@ void EquipmentModule::read_sensors() {
             char key[48];
             int zn = (int)(z + 1);
             float val = 0.0f;
+
+            // Per-zone air temperature (кожна зона — окремий датчик)
+            if (zones_[z].air_sensor) {
+                if (zones_[z].air_sensor->read(val)) {
+                    if (!zones_[z].ema_air_z_init) { zones_[z].ema_air_z = val; zones_[z].ema_air_z_init = true; }
+                    else { zones_[z].ema_air_z += (val - zones_[z].ema_air_z) * alpha; }
+                    snprintf(key, sizeof(key), "equipment.air_temp_z%d", zn);
+                    state_set(key, roundf(zones_[z].ema_air_z * 100.0f) / 100.0f);
+                }
+                snprintf(key, sizeof(key), "equipment.sensor1_z%d_ok", zn);
+                state_set(key, zones_[z].air_sensor->is_healthy());
+            }
 
             // Per-zone evaporator temperature
             if (zones_[z].evap_sensor) {
