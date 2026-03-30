@@ -16,14 +16,11 @@
     {"id": "relay_3", "expander": "relay_exp", "pin": 2, "active_high": false, "label": "Реле 3 (вент. конденсатора)"},
     {"id": "relay_4", "expander": "relay_exp", "pin": 3, "active_high": false, "label": "Реле 4 (відтайка)"},
     {"id": "relay_5", "expander": "relay_exp", "pin": 4, "active_high": false, "label": "Реле 5 (освітлення)"},
-    {"id": "relay_6", "expander": "relay_exp", "pin": 5, "active_high": false, "label": "Реле 6 (резерв)"},
-    {"id": "relay_7", "expander": "relay_exp", "pin": 6, "active_high": false, "label": "Реле 7 (PCF8574 pin 6)"},
-    {"id": "relay_8", "expander": "relay_exp", "pin": 7, "active_high": false, "label": "Реле 8 (PCF8574 pin 7)"},
-
-    {"id": "eev_step_1", "expander": "input_exp", "pin": 2, "active_high": true, "label": "EEV STEP z1 (mod: DIN3 → output)"},
-    {"id": "eev_dir_1",  "expander": "input_exp", "pin": 3, "active_high": true, "label": "EEV DIR z1 (mod: DIN4 → output)"},
-    {"id": "eev_step_2", "expander": "input_exp", "pin": 4, "active_high": true, "label": "EEV STEP z2 (mod: DIN5 → output)"},
-    {"id": "eev_dir_2",  "expander": "input_exp", "pin": 5, "active_high": true, "label": "EEV DIR z2 (mod: DIN6 → output)"}
+    {"id": "relay_6", "expander": "relay_exp", "pin": 5, "active_high": false, "label": "Реле 6 (резерв)"}
+  ],
+  "stepper_outputs": [
+    {"id": "eev_port_1", "expander": "input_exp", "step_pin": 2, "dir_pin": 3, "label": "Степер порт 1"},
+    {"id": "eev_port_2", "expander": "input_exp", "step_pin": 4, "dir_pin": 5, "label": "Степер порт 2"}
   ],
   "expander_inputs": [
     {"id": "din_1", "expander": "input_exp", "pin": 0, "invert": true, "label": "Вхід 1 (двері)"},
@@ -44,8 +41,8 @@
     {"id": "adc_4", "gpio": 35, "atten": 3, "label": "ADC 4"}
   ],
   "dac_channels": [
-    {"id": "dac_1", "gpio": 25, "label": "DAC 1 — EEV 0-10V (через LM258 op-amp → EVD Mini/EKF)"},
-    {"id": "dac_2", "gpio": 26, "label": "DAC 2 — резерв 0-10V"}
+    {"id": "dac_1", "gpio": 25, "label": "Аналог 0-10V (1)"},
+    {"id": "dac_2", "gpio": 26, "label": "Аналог 0-10V (2)"}
   ],
   "uart_buses": [
     {"id": "rs485_1", "tx_gpio": 27, "rx_gpio": 14, "label": "RS-485 Modbus Slave (MAX13487, auto DE)"},

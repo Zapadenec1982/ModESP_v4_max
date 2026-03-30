@@ -138,6 +138,12 @@ bool DriverManager::init(const BindingTable& bindings, HAL& hal) {
             ok = add_sensor(create_pcf_sensor(binding, hal), binding);
         } else if (binding.driver_type == "eev_pcf8574_stepper") {
             ok = add_actuator(create_eev_pcf_stepper(binding, hal), binding);
+        } else if (binding.driver_type == "eev_analog") {
+            ok = add_actuator(create_eev_analog(binding, hal), binding);
+        } else if (binding.driver_type == "eev_stepper") {
+            ok = add_actuator(create_eev_stepper(binding, hal), binding);
+        } else if (binding.driver_type == "akv_pulse") {
+            ok = add_actuator(create_akv_pulse(binding, hal), binding);
         } else {
             ESP_LOGW(TAG, "  Unknown driver type '%s' for binding '%s'",
                      binding.driver_type.c_str(),
@@ -327,37 +333,52 @@ IActuatorDriver* DriverManager::create_eev_pcf_stepper(const Binding& binding, H
         return nullptr;
     }
 
-    // Binding format: hardware_id = "din_1" (STEP pin position)
-    // Extra fields: dir_hardware = "din_2", max_steps = 480
-    auto* step_cfg = hal.find_expander_input(
+    // Binding hardware_id = "eev_port_1" → stepper_outputs section in board.json
+    auto* stepper_cfg = hal.find_stepper_output(
         etl::string_view(binding.hardware_id.c_str(), binding.hardware_id.size()));
-    if (!step_cfg) {
-        ESP_LOGE(TAG, "STEP input '%s' not found", binding.hardware_id.c_str());
+    if (!stepper_cfg) {
+        ESP_LOGE(TAG, "Stepper output '%s' not found in HAL", binding.hardware_id.c_str());
         return nullptr;
     }
 
-    // DIR pin: use next DIN (step_pin + 1) by convention
-    uint8_t step_pin = step_cfg->pin;
-    uint8_t dir_pin = step_pin + 1;
-
-    // Find expander resource
+    // Find expander resource by expander_id
     auto* expander = hal.find_i2c_expander(
-        etl::string_view(step_cfg->expander_id.c_str(), step_cfg->expander_id.size()));
+        etl::string_view(stepper_cfg->expander_id.c_str(), stepper_cfg->expander_id.size()));
     if (!expander) {
-        ESP_LOGE(TAG, "Expander '%s' not found", step_cfg->expander_id.c_str());
+        ESP_LOGE(TAG, "Expander '%s' not found", stepper_cfg->expander_id.c_str());
         return nullptr;
     }
 
-    // Default 480 for E2V. TODO: configurable via binding options or SharedState
-    uint16_t max_steps = 480;
+    uint16_t max_steps = 480;  // Default for E2V, configurable via SharedState
 
     auto& drv = eev_pcf_pool[eev_pcf_count++];
-    drv.configure(binding.role.c_str(), expander, step_pin, dir_pin,
+    drv.configure(binding.role.c_str(), expander, stepper_cfg->step_pin, stepper_cfg->dir_pin,
                   max_steps, "eev_pos");
 
     ESP_LOGI(TAG, "  EEV PCF8574 stepper '%s' STEP=pin%d DIR=pin%d max=%u on '%s'",
-             binding.role.c_str(), step_pin, dir_pin, max_steps,
+             binding.role.c_str(), stepper_cfg->step_pin, stepper_cfg->dir_pin, max_steps,
              expander->id.c_str());
+    return &drv;
+}
+
+IActuatorDriver* DriverManager::create_eev_analog(const Binding& binding, HAL& hal) {
+    if (eev_analog_count >= MAX_VALVES) {
+        ESP_LOGE(TAG, "EEV analog pool exhausted");
+        return nullptr;
+    }
+
+    auto* dac_res = hal.find_dac_channel(
+        etl::string_view(binding.hardware_id.c_str(), binding.hardware_id.size()));
+    if (!dac_res) {
+        ESP_LOGE(TAG, "DAC channel '%s' not found in HAL", binding.hardware_id.c_str());
+        return nullptr;
+    }
+
+    auto& drv = eev_analog_pool[eev_analog_count++];
+    drv.configure(binding.role.c_str(), (int)dac_res->gpio, 255);
+
+    ESP_LOGI(TAG, "  EEV analog '%s' on DAC GPIO %d",
+             binding.role.c_str(), (int)dac_res->gpio);
     return &drv;
 }
 
@@ -385,6 +406,71 @@ ISensorDriver* DriverManager::create_pcf_sensor(const Binding& binding, HAL& hal
 
     auto& drv = pcf_input_pool[pcf_input_count++];
     drv.configure(binding.role.c_str(), expander, in_cfg->pin, in_cfg->invert);
+    return &drv;
+}
+
+IActuatorDriver* DriverManager::create_eev_stepper(const Binding& binding, HAL& hal) {
+    if (eev_stepper_count >= MAX_VALVES) {
+        ESP_LOGE(TAG, "EEV stepper pool exhausted");
+        return nullptr;
+    }
+
+    // GPIO-based stepper: hardware_id = GPIO output for STEP pin
+    // For boards with stepper_outputs section, use find_stepper_output
+    auto* stepper_cfg = hal.find_stepper_output(
+        etl::string_view(binding.hardware_id.c_str(), binding.hardware_id.size()));
+    if (!stepper_cfg) {
+        // Fallback: try GPIO output (future boards with direct GPIO stepper drivers)
+        auto* gpio_res = hal.find_gpio_output(
+            etl::string_view(binding.hardware_id.c_str(), binding.hardware_id.size()));
+        if (!gpio_res) {
+            ESP_LOGW(TAG, "Stepper output '%s' not found (no stepper_outputs or gpio_outputs)",
+                     binding.hardware_id.c_str());
+            return nullptr;
+        }
+        // GPIO stepper: step_gpio from resource, dir/enable from conventions
+        EevStepperConfig cfg = {};
+        cfg.step_gpio = (int)gpio_res->gpio;
+        cfg.dir_gpio = -1;
+        cfg.enable_gpio = -1;
+        cfg.max_steps = 480;
+        cfg.homing_extra_steps = 50;
+        cfg.drive_freq_hz = 50;
+        cfg.emergency_freq_hz = 150;
+        cfg.invert_dir = false;
+        cfg.nvs_namespace = "eev_pos";
+
+        auto& drv = eev_stepper_pool[eev_stepper_count++];
+        drv.configure(binding.role.c_str(), cfg);
+        return &drv;
+    }
+
+    // stepper_outputs entry found — but eev_stepper expects GPIO pins, not expander
+    // This driver type is for direct GPIO steppers (TMC2209), not PCF8574
+    ESP_LOGW(TAG, "eev_stepper driver requires GPIO pins, not I2C expander. Use eev_pcf8574_stepper for '%s'",
+             binding.hardware_id.c_str());
+    return nullptr;
+}
+
+IActuatorDriver* DriverManager::create_akv_pulse(const Binding& binding, HAL& hal) {
+    if (akv_count >= MAX_VALVES) {
+        ESP_LOGE(TAG, "AKV pulse pool exhausted");
+        return nullptr;
+    }
+
+    auto* gpio_res = hal.find_gpio_output(
+        etl::string_view(binding.hardware_id.c_str(), binding.hardware_id.size()));
+    if (!gpio_res) {
+        ESP_LOGW(TAG, "GPIO output '%s' not found for AKV pulse driver",
+                 binding.hardware_id.c_str());
+        return nullptr;
+    }
+
+    auto& drv = akv_pool[akv_count++];
+    drv.configure(binding.role.c_str(), (int)gpio_res->gpio, 6000, 10);
+
+    ESP_LOGI(TAG, "  AKV pulse '%s' on GPIO %d (6s cycle)",
+             binding.role.c_str(), (int)gpio_res->gpio);
     return &drv;
 }
 

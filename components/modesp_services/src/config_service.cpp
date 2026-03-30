@@ -21,8 +21,8 @@ static const char TAG[] = "ConfigSvc";
 // Спільний parse-буфер для board.json і bindings.json (boot-only, sequential calls)
 // Один набір замість двох static local — економія ~8 KB BSS
 namespace {
-// ⚠️ Буфери ПОВИННІ збігатись з ConfigService::MAX_JSON_SIZE (3072) і MAX_TOKENS (350)!
-static char s_json_buf[3072];
+// ⚠️ Буфери ПОВИННІ збігатись з ConfigService::MAX_JSON_SIZE (4096) і MAX_TOKENS (350)!
+static char s_json_buf[4096];
 static jsmntok_t s_json_tokens[350];
 }  // namespace
 
@@ -334,6 +334,41 @@ bool ConfigService::parse_board_json() {
                 }
             }
             i = j;
+        } else if (jsoneq(buf, &tokens[i], "dac_channels")) {
+            if (tokens[i + 1].type != JSMN_ARRAY) {
+                ESP_LOGE(TAG, "board.json: 'dac_channels' is not array");
+                return false;
+            }
+            int arr_size = tokens[i + 1].size;
+            int j = i + 2;
+
+            for (int elem = 0; elem < arr_size; elem++) {
+                if (tokens[j].type != JSMN_OBJECT) {
+                    ESP_LOGE(TAG, "board.json: dac_channel entry is not object");
+                    return false;
+                }
+                int obj_keys = tokens[j].size;
+                j++;
+
+                DacChannelConfig cfg = {};
+                for (int k = 0; k < obj_keys; k++) {
+                    if (jsoneq(buf, &tokens[j], "id")) {
+                        tok_to_str(buf, &tokens[j + 1], tmp, sizeof(tmp));
+                        cfg.id = tmp;
+                        j += 2;
+                    } else if (jsoneq(buf, &tokens[j], "gpio")) {
+                        cfg.gpio = (gpio_num_t)tok_to_int(buf, &tokens[j + 1]);
+                        j += 2;
+                    } else {
+                        j += 2;
+                    }
+                }
+
+                if (!board_config_.dac_channels.full()) {
+                    board_config_.dac_channels.push_back(cfg);
+                }
+            }
+            i = j;
         } else if (jsoneq(buf, &tokens[i], "i2c_buses")) {
             if (tokens[i + 1].type != JSMN_ARRAY) {
                 ESP_LOGE(TAG, "board.json: 'i2c_buses' is not array");
@@ -482,6 +517,42 @@ bool ConfigService::parse_board_json() {
                 }
                 if (!board_config_.expander_inputs.full()) {
                     board_config_.expander_inputs.push_back(cfg);
+                }
+            }
+            i = j;
+        } else if (jsoneq(buf, &tokens[i], "stepper_outputs")) {
+            if (tokens[i + 1].type != JSMN_ARRAY) {
+                ESP_LOGE(TAG, "board.json: 'stepper_outputs' is not array");
+                return false;
+            }
+            int arr_size = tokens[i + 1].size;
+            int j = i + 2;
+
+            for (int elem = 0; elem < arr_size; elem++) {
+                if (tokens[j].type != JSMN_OBJECT) {
+                    ESP_LOGE(TAG, "board.json: stepper_output entry is not object");
+                    return false;
+                }
+                int obj_keys = tokens[j].size;
+                j++;
+
+                StepperOutputConfig cfg = {};
+                for (int k = 0; k < obj_keys; k++) {
+                    if (jsoneq(buf, &tokens[j], "id")) {
+                        tok_to_str(buf, &tokens[j + 1], tmp, sizeof(tmp));
+                        cfg.id = tmp;
+                    } else if (jsoneq(buf, &tokens[j], "expander")) {
+                        tok_to_str(buf, &tokens[j + 1], tmp, sizeof(tmp));
+                        cfg.expander_id = tmp;
+                    } else if (jsoneq(buf, &tokens[j], "step_pin")) {
+                        cfg.step_pin = (uint8_t)tok_to_int(buf, &tokens[j + 1]);
+                    } else if (jsoneq(buf, &tokens[j], "dir_pin")) {
+                        cfg.dir_pin = (uint8_t)tok_to_int(buf, &tokens[j + 1]);
+                    }
+                    j += 2;
+                }
+                if (!board_config_.stepper_outputs.full()) {
+                    board_config_.stepper_outputs.push_back(cfg);
                 }
             }
             i = j;

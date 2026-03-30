@@ -37,6 +37,11 @@ bool HAL::init(const BoardConfig& config) {
         return false;
     }
 
+    if (!init_dac(config)) {
+        ESP_LOGE(TAG, "DAC init failed");
+        return false;
+    }
+
     // I2C buses та expanders (тільки якщо є в config)
     if (!config.i2c_buses.empty()) {
         if (!init_i2c(config)) {
@@ -230,6 +235,42 @@ GpioInputResource* HAL::find_gpio_input(etl::string_view id) {
     return nullptr;
 }
 
+bool HAL::init_dac(const BoardConfig& config) {
+    dac_count_ = 0;
+
+    if (config.dac_channels.empty()) {
+        return true;  // No DAC channels — normal
+    }
+
+    for (const auto& cfg : config.dac_channels) {
+        if (dac_count_ >= MAX_DAC_CHANNELS) {
+            ESP_LOGW(TAG, "DAC channel limit reached (%d)", (int)MAX_DAC_CHANNELS);
+            break;
+        }
+
+        // Store config — actual DAC init happens in driver (dac_output_voltage)
+        auto& res = dac_channels_[dac_count_];
+        res.id = cfg.id;
+        res.gpio = cfg.gpio;
+        res.initialized = true;
+        dac_count_++;
+
+        ESP_LOGI(TAG, "  DAC '%s' on GPIO %d", cfg.id.c_str(), cfg.gpio);
+    }
+
+    return true;
+}
+
+DacChannelResource* HAL::find_dac_channel(etl::string_view id) {
+    for (size_t i = 0; i < dac_count_; i++) {
+        if (dac_channels_[i].id.size() == id.size() &&
+            etl::string_view(dac_channels_[i].id.c_str(), dac_channels_[i].id.size()) == id) {
+            return &dac_channels_[i];
+        }
+    }
+    return nullptr;
+}
+
 AdcChannelResource* HAL::find_adc_channel(etl::string_view id) {
     for (size_t i = 0; i < adc_count_; i++) {
         if (adc_channels_[i].id.size() == id.size() &&
@@ -335,11 +376,13 @@ bool HAL::init_i2c_expanders(const BoardConfig& config) {
                  cfg.id.c_str(), cfg.chip.c_str(), cfg.address, cfg.bus_id.c_str());
     }
 
-    // Зберігаємо output/input configs для lookup
+    // Зберігаємо output/input/stepper configs для lookup
     expander_outputs_.clear();
     for (const auto& c : config.expander_outputs) expander_outputs_.push_back(c);
     expander_inputs_.clear();
     for (const auto& c : config.expander_inputs) expander_inputs_.push_back(c);
+    stepper_outputs_.clear();
+    for (const auto& c : config.stepper_outputs) stepper_outputs_.push_back(c);
 
     return true;
 }
@@ -387,6 +430,16 @@ I2CExpanderOutputConfig* HAL::find_expander_output(etl::string_view id) {
 
 I2CExpanderInputConfig* HAL::find_expander_input(etl::string_view id) {
     for (auto& cfg : expander_inputs_) {
+        if (cfg.id.size() == id.size() &&
+            etl::string_view(cfg.id.c_str(), cfg.id.size()) == id) {
+            return &cfg;
+        }
+    }
+    return nullptr;
+}
+
+StepperOutputConfig* HAL::find_stepper_output(etl::string_view id) {
+    for (auto& cfg : stepper_outputs_) {
         if (cfg.id.size() == id.size() &&
             etl::string_view(cfg.id.c_str(), cfg.id.size()) == id) {
             return &cfg;

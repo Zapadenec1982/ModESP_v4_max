@@ -1,7 +1,7 @@
 <script>
   import { onDestroy } from "svelte";
   import { fade } from "svelte/transition";
-  import { pages, deviceName } from "../stores/ui.js";
+  import { pages, deviceName, accessLevel } from "../stores/ui.js";
   import { wsConnected, state } from "../stores/state.js";
   import { theme, toggleTheme } from "../stores/theme.js";
   import { t, language, cycleLanguage } from "../stores/i18n.js";
@@ -117,6 +117,20 @@
       {/each}
     </nav>
     <div class="sidebar-footer">
+      <div class="level-selector">
+        <button class="lvl-btn" class:active={$accessLevel === 'basic'}
+          on:click={() => $accessLevel = 'basic'}>
+          {$t['ui.level.basic'] || 'Основне'}
+        </button>
+        <button class="lvl-btn" class:active={$accessLevel === 'service'}
+          on:click={() => $accessLevel = 'service'}>
+          {$t['ui.level.service'] || 'Сервіс'}
+        </button>
+        <button class="lvl-btn" class:active={$accessLevel === 'expert'}
+          on:click={() => $accessLevel = 'expert'}>
+          {$t['ui.level.expert'] || 'Експерт'}
+        </button>
+      </div>
       <div class="ws-status" class:connected={$wsConnected}>
         <span class="ws-dot"></span>
         {$wsConnected ? $t["status.online"] : $t["status.offline"]}
@@ -403,6 +417,39 @@
   .sidebar-footer {
     padding: 16px 20px;
     border-top: 0.5px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .level-selector {
+    display: flex;
+    gap: 2px;
+    background: var(--surface-2);
+    border-radius: 8px;
+    padding: 2px;
+  }
+
+  .lvl-btn {
+    flex: 1;
+    padding: 6px 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-3);
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+
+  .lvl-btn:hover { color: var(--text-1); }
+
+  .lvl-btn.active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
   }
 
   .ws-status {

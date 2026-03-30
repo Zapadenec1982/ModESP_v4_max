@@ -34,6 +34,9 @@ public:
     /// Find an ADC channel resource by hardware ID (e.g. "adc_1")
     AdcChannelResource*  find_adc_channel(etl::string_view id);
 
+    /// Find a DAC channel resource by hardware ID (e.g. "dac_1")
+    DacChannelResource*  find_dac_channel(etl::string_view id);
+
     /// Find an I2C expander resource by ID (e.g. "relay_exp")
     I2CExpanderResource*       find_i2c_expander(etl::string_view id);
 
@@ -43,10 +46,14 @@ public:
     /// Find an expander input config by hardware ID (e.g. "din_1")
     I2CExpanderInputConfig*    find_expander_input(etl::string_view id);
 
+    /// Find a stepper output config by hardware ID (e.g. "eev_port_1")
+    StepperOutputConfig*       find_stepper_output(etl::string_view id);
+
     size_t gpio_output_count()  const { return gpio_output_count_; }
     size_t onewire_count()      const { return onewire_count_; }
     size_t gpio_input_count()   const { return gpio_input_count_; }
     size_t adc_count()          const { return adc_count_; }
+    size_t dac_count()          const { return dac_count_; }
     size_t i2c_expander_count() const { return i2c_expander_count_; }
 
 private:
@@ -54,15 +61,18 @@ private:
     etl::array<OneWireBusResource, MAX_ONEWIRE_BUSES>  onewire_buses_;
     etl::array<GpioInputResource, MAX_ADC_CHANNELS>    gpio_inputs_;
     etl::array<AdcChannelResource, MAX_ADC_CHANNELS>   adc_channels_;
+    etl::array<DacChannelResource, MAX_DAC_CHANNELS>   dac_channels_;
     etl::array<I2CBusResource, MAX_I2C_BUSES>          i2c_buses_;
     etl::array<I2CExpanderResource, MAX_I2C_EXPANDERS> i2c_expanders_;
     etl::vector<I2CExpanderOutputConfig, MAX_EXPANDER_IOS> expander_outputs_;
     etl::vector<I2CExpanderInputConfig, MAX_EXPANDER_IOS>  expander_inputs_;
+    etl::vector<StepperOutputConfig, 4>                    stepper_outputs_;
 
     size_t gpio_output_count_  = 0;
     size_t onewire_count_      = 0;
     size_t gpio_input_count_   = 0;
     size_t adc_count_          = 0;
+    size_t dac_count_          = 0;
     size_t i2c_bus_count_      = 0;
     size_t i2c_expander_count_ = 0;
 
@@ -70,6 +80,7 @@ private:
     bool init_onewire(const BoardConfig& config);
     bool init_gpio_inputs(const BoardConfig& config);
     bool init_adc(const BoardConfig& config);
+    bool init_dac(const BoardConfig& config);
     bool init_i2c(const BoardConfig& config);
     bool init_i2c_expanders(const BoardConfig& config);
 };

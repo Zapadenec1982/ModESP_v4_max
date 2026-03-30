@@ -42,6 +42,11 @@ public:
 
     EevStepperDriver(const char* role, const EevStepperConfig& cfg);
 
+    /// Configure after pool allocation (used by DriverManager)
+    void configure(const char* role, const EevStepperConfig& cfg) {
+        role_ = role; cfg_ = cfg;
+    }
+
     // ── IValveDriver ──
     bool     set_position(uint16_t target) override;
     uint16_t get_position() const override { return current_pos_; }

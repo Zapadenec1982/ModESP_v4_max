@@ -111,22 +111,6 @@
 
 {#if page}
   <div class="page-grid page-padding">
-    <!-- Access Level Selector -->
-    <div class="level-selector">
-      <button class="lvl-btn" class:active={$accessLevel === 'basic'}
-        on:click={() => $accessLevel = 'basic'}>
-        {$t['ui.level.basic'] || 'Основне'}
-      </button>
-      <button class="lvl-btn" class:active={$accessLevel === 'service'}
-        on:click={() => $accessLevel = 'service'}>
-        {$t['ui.level.service'] || 'Сервіс'}
-      </button>
-      <button class="lvl-btn" class:active={$accessLevel === 'expert'}
-        on:click={() => $accessLevel = 'expert'}>
-        {$t['ui.level.expert'] || 'Експерт'}
-      </button>
-    </div>
-
     {#if isProtection}
       <!-- Protection Status Hero -->
       {#if alarmActive}

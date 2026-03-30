@@ -67,7 +67,16 @@
 
 class ProtectionModule : public modesp::BaseModule {
 public:
+    /// Default constructor (backward compatible, single-zone)
     ProtectionModule();
+
+    /// Multi-zone constructor with namespace + InputBindings
+    /// @param ns       Namespace ("protection" for z1, "protection_z2" for z2)
+    /// @param inputs   InputBinding array for zone-specific key remapping
+    /// @param primary  true = owns compressor tracker; false = temperature alarms only
+    ProtectionModule(const char* ns,
+                     etl::span<const modesp::InputBinding> inputs,
+                     bool primary = true);
 
     bool on_init() override;
     void on_update(uint32_t dt_ms) override;
@@ -213,6 +222,9 @@ private:
     int32_t  haccp_delay_min_          = 0;         // Htd: додаткова затримка HACCP (0=disabled)
     int32_t  haccp_ha_count_           = 0;         // Лічильник HA алармів
     int32_t  haccp_hf_count_           = 0;         // Лічильник HF алармів
+
+    // Primary instance owns compressor tracker; secondary = temperature alarms only
+    bool is_primary_ = true;
 
     // Кешований код аварії
     const char* alarm_code_ = "none";

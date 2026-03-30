@@ -108,7 +108,36 @@ static modesp::ModbusService   modbus_service;
 static EquipmentModule         equipment;
 
 // Protection (HIGH priority — alarm monitoring, runs before thermostat)
-static ProtectionModule        protection;
+// Zone 1 = primary (owns compressor tracker), Zone 2 = temperature alarms only
+
+static constexpr modesp::InputBinding z1_prot_inputs[] = {
+    {"equipment.air_temp",       "equipment.air_temp"},
+    {"equipment.sensor1_ok",     "equipment.sensor1_ok"},
+    {"equipment.sensor2_ok",     "equipment.sensor2_ok"},
+    {"equipment.door_open",      "equipment.door_open"},
+    {"equipment.compressor",     "equipment.compressor"},
+    {"defrost.active",           "defrost_z1.active"},
+    {"defrost.phase",            "defrost_z1.phase"},
+    {"thermostat.cc_remaining",  "thermo_z1.cc_remaining"},
+    {"thermostat.cc_alarm_bypass","thermo_z1.cc_alarm_bypass"},
+};
+static constexpr modesp::InputBinding z2_prot_inputs[] = {
+    {"equipment.zone_enabled",   "equipment.zone2_enabled"},
+    {"equipment.air_temp",       "equipment.air_temp_z2"},
+    {"equipment.sensor1_ok",     "equipment.sensor1_z2_ok"},
+    {"equipment.sensor2_ok",     "equipment.sensor2_z2_ok"},
+    {"equipment.door_open",      "equipment.door_open"},
+    {"equipment.compressor",     "equipment.compressor"},
+    {"defrost.active",           "defrost_z2.active"},
+    {"defrost.phase",            "defrost_z2.phase"},
+    {"thermostat.cc_remaining",  "thermo_z2.cc_remaining"},
+    {"thermostat.cc_alarm_bypass","thermo_z2.cc_alarm_bypass"},
+};
+
+static ProtectionModule protection(
+    "protection", z1_prot_inputs, true);   // primary — compressor tracker
+static ProtectionModule protection_z2(
+    "protection_z2", z2_prot_inputs, false); // secondary — temp alarms only
 
 // Business modules (NORMAL priority — work through SharedState)
 // Always compiled for 2 zones. Zone 2 activation is RUNTIME via WebUI.
@@ -299,7 +328,19 @@ extern "C" void app_main(void)
              (int)driver_manager.actuator_count());
 
     // ── Step 7: Register Equipment Manager + business modules ──
+    // Read active_zones ONCE — used for both Equipment and zone module registration.
+    // PersistService already restored this from NVS in Phase 1.
+    int32_t active_zones = 1;
+    {
+        auto val = app.state().get("equipment.active_zones");
+        if (val.has_value()) {
+            const auto* iv = etl::get_if<int32_t>(&val.value());
+            if (iv) active_zones = *iv;
+        }
+    }
+
     // EM — єдиний модуль з доступом до HAL (CRITICAL priority)
+    equipment.set_zone_count(static_cast<size_t>(active_zones));
     equipment.bind_drivers(driver_manager);
     app.modules().register_module(equipment);
 
@@ -307,30 +348,22 @@ extern "C" void app_main(void)
     app.modules().register_module(protection);
 
     // Thermostat + Defrost + EEV — Zone 1 always, Zone 2 conditional.
-    // equipment.active_zones persisted in NVS, restored by PersistService in Phase 1.
     // Zone change requires restart (промисловий стандарт: Danfoss/CAREL теж).
     app.modules().register_module(thermostat_z1);
     app.modules().register_module(defrost_z1);
     app.modules().register_module(eev_z1);
 
-    // Zone 2 — conditional registration based on persisted active_zones
-    {
-        int32_t active_zones = 1;
-        auto val = app.state().get("equipment.active_zones");
-        if (val.has_value()) {
-            const auto* iv = etl::get_if<int32_t>(&val.value());
-            if (iv) active_zones = *iv;
-        }
-        if (active_zones >= 2) {
-            app.modules().register_module(thermostat_z2);
-            app.modules().register_module(defrost_z2);
-            app.modules().register_module(eev_z2);
-            ESP_LOGI(TAG, "Zone 2 modules registered (active_zones=%ld)",
-                     static_cast<long>(active_zones));
-        } else {
-            ESP_LOGI(TAG, "Single zone mode (active_zones=%ld)",
-                     static_cast<long>(active_zones));
-        }
+    // Zone 2 — conditional registration
+    if (active_zones >= 2) {
+        app.modules().register_module(protection_z2);
+        app.modules().register_module(thermostat_z2);
+        app.modules().register_module(defrost_z2);
+        app.modules().register_module(eev_z2);
+        ESP_LOGI(TAG, "Zone 2 modules registered (active_zones=%ld)",
+                 static_cast<long>(active_zones));
+    } else {
+        ESP_LOGI(TAG, "Single zone mode (active_zones=%ld)",
+                 static_cast<long>(active_zones));
     }
 
     // Lighting — освітлення камери (NORMAL priority)

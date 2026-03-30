@@ -11,6 +11,7 @@
     {"hardware": "din_1",   "driver": "pcf8574_input", "role": "door_contact",  "module": "equipment"},
     {"hardware": "din_2",   "driver": "pcf8574_input", "role": "night_input",   "module": "equipment"},
     {"hardware": "adc_1",   "driver": "pressure_adc",  "role": "suction_p",     "module": "equipment"},
-    {"hardware": "eev_step_1", "driver": "eev_pcf8574_stepper", "role": "eev",  "module": "equipment"}
+    {"hardware": "dac_1", "driver": "eev_analog", "role": "eev", "module": "equipment"},
+    {"hardware": "ow_2",  "driver": "ds18b20",    "role": "air_temp_z2", "module": "equipment", "address": "28:41:A7:45:D4:47:2C:AD"}
   ]
 }

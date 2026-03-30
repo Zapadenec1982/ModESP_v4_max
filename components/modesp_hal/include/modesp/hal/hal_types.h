@@ -27,6 +27,7 @@ namespace modesp {
 static constexpr size_t MAX_RELAYS         = 8;
 static constexpr size_t MAX_ONEWIRE_BUSES  = 4;
 static constexpr size_t MAX_ADC_CHANNELS   = 8;
+static constexpr size_t MAX_DAC_CHANNELS   = 2;   // ESP32: GPIO25 + GPIO26
 static constexpr size_t MAX_PWM_CHANNELS   = 8;
 static constexpr size_t MAX_BINDINGS       = 24;
 static constexpr size_t MAX_SENSORS        = 8;
@@ -72,6 +73,11 @@ struct AdcChannelConfig {
     uint8_t atten;      // 0=0dB, 2=2.5dB, 6=6dB, 11=11dB (0-3.3V)
 };
 
+struct DacChannelConfig {
+    HalId id;
+    gpio_num_t gpio;        // ESP32: GPIO25 (DAC1) or GPIO26 (DAC2)
+};
+
 struct I2CBusConfig {
     HalId id;               // "i2c_0"
     gpio_num_t sda;
@@ -101,6 +107,13 @@ struct I2CExpanderInputConfig {
     bool invert;            // true для KC868-A6 (opto-isolated active-LOW)
 };
 
+struct StepperOutputConfig {
+    HalId id;               // "eev_port_1"
+    HalId expander_id;      // "input_exp"
+    uint8_t step_pin;       // 2
+    uint8_t dir_pin;        // 3
+};
+
 struct BoardConfig {
     etl::string<24> board_name;
     etl::string<8>  board_version;
@@ -108,10 +121,12 @@ struct BoardConfig {
     etl::vector<OneWireBusConfig, MAX_ONEWIRE_BUSES>              onewire_buses;
     etl::vector<GpioInputConfig, MAX_ADC_CHANNELS>                gpio_inputs;
     etl::vector<AdcChannelConfig, MAX_ADC_CHANNELS>               adc_channels;
+    etl::vector<DacChannelConfig, MAX_DAC_CHANNELS>               dac_channels;
     etl::vector<I2CBusConfig, MAX_I2C_BUSES>                      i2c_buses;
     etl::vector<I2CExpanderConfig, MAX_I2C_EXPANDERS>             i2c_expanders;
     etl::vector<I2CExpanderOutputConfig, MAX_EXPANDER_IOS>        expander_outputs;
     etl::vector<I2CExpanderInputConfig, MAX_EXPANDER_IOS>         expander_inputs;
+    etl::vector<StepperOutputConfig, 4>                           stepper_outputs;
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -158,6 +173,12 @@ struct AdcChannelResource {
     HalId id;
     gpio_num_t gpio;
     uint8_t atten;
+    bool initialized = false;
+};
+
+struct DacChannelResource {
+    HalId id;
+    gpio_num_t gpio;
     bool initialized = false;
 };
 

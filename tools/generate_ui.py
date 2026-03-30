@@ -546,6 +546,7 @@ BOARD_SECTION_TO_HW_TYPE = {
     "i2c_buses": "i2c_bus",
     "expander_outputs": "i2c_expander_output",
     "expander_inputs": "i2c_expander_input",
+    "stepper_outputs": "i2c_expander_stepper",
 }
 
 

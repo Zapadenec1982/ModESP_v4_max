@@ -184,6 +184,19 @@ protected:
         return read_int(resolve_input(role), def);
     }
 
+protected:
+    /// Resolve input role to SharedState key via InputBinding lookup
+    const char* resolve_input(const char* role) const {
+        for (const auto& b : inputs_) {
+            // Simple strcmp
+            const char* a = b.role;
+            const char* r = role;
+            while (*a && *a == *r) { a++; r++; }
+            if (*a == *r) return b.default_key;
+        }
+        return role;  // fallback: use role as-is
+    }
+
 private:
     friend class ModuleManager;  // ModuleManager встановлює зв'язки
 
@@ -196,18 +209,6 @@ private:
 
     // Namespace key buffer (for ns_key() — single-threaded, reused)
     char ns_buf_[64] = {};
-
-    /// Resolve input role to SharedState key via InputBinding lookup
-    const char* resolve_input(const char* role) const {
-        for (const auto& b : inputs_) {
-            // Simple strcmp
-            const char* a = b.role;
-            const char* r = role;
-            while (*a && *a == *r) { a++; r++; }
-            if (*a == *r) return b.default_key;
-        }
-        return role;  // fallback: use role as-is
-    }
 
     // Зворотні посилання (встановлює ModuleManager при реєстрації)
     ModuleManager* manager_ = nullptr;

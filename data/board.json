@@ -2,52 +2,50 @@
   "manifest_version": 1,
   "board": "kc868_a6",
   "version": "1.1.0",
-  "description": "KC868-A6: 6 relay, 6 DI, 2 DAC, 4 ADC, I2C, RS-485",
+  "description": "Kincony KC868-A6 — 6 реле (PCF8574), 6 входів (PCF8574), 2 DAC, 4 ADC, I2C, RS-485",
   "i2c_buses": [
-    {"id": "i2c_0", "sda": 4, "scl": 15, "freq_hz": 100000, "label": "I2C"}
+    {"id": "i2c_0", "sda": 4, "scl": 15, "freq_hz": 100000, "label": "I2C шина"}
   ],
   "i2c_expanders": [
-    {"id": "relay_exp", "bus": "i2c_0", "chip": "pcf8574", "address": "0x24", "pins": 8, "label": "Relay"},
-    {"id": "input_exp", "bus": "i2c_0", "chip": "pcf8574", "address": "0x22", "pins": 8, "label": "Input"}
+    {"id": "relay_exp",  "bus": "i2c_0", "chip": "pcf8574", "address": "0x24", "pins": 8, "label": "Реле PCF8574"},
+    {"id": "input_exp",  "bus": "i2c_0", "chip": "pcf8574", "address": "0x22", "pins": 8, "label": "Входи PCF8574"}
   ],
   "expander_outputs": [
-    {"id": "relay_1", "expander": "relay_exp", "pin": 0, "active_high": false, "label": "R1"},
-    {"id": "relay_2", "expander": "relay_exp", "pin": 1, "active_high": false, "label": "R2"},
-    {"id": "relay_3", "expander": "relay_exp", "pin": 2, "active_high": false, "label": "R3"},
-    {"id": "relay_4", "expander": "relay_exp", "pin": 3, "active_high": false, "label": "R4"},
-    {"id": "relay_5", "expander": "relay_exp", "pin": 4, "active_high": false, "label": "R5"},
-    {"id": "relay_6", "expander": "relay_exp", "pin": 5, "active_high": false, "label": "R6"},
-    {"id": "relay_7", "expander": "relay_exp", "pin": 6, "active_high": false, "label": "R7"},
-    {"id": "relay_8", "expander": "relay_exp", "pin": 7, "active_high": false, "label": "R8"},
-    {"id": "eev_step_1", "expander": "input_exp", "pin": 2, "active_high": true, "label": "STEP1"},
-    {"id": "eev_dir_1", "expander": "input_exp", "pin": 3, "active_high": true, "label": "DIR1"},
-    {"id": "eev_step_2", "expander": "input_exp", "pin": 4, "active_high": true, "label": "STEP2"},
-    {"id": "eev_dir_2", "expander": "input_exp", "pin": 5, "active_high": true, "label": "DIR2"}
+    {"id": "relay_1", "expander": "relay_exp", "pin": 0, "active_high": false, "label": "Реле 1 (компресор)"},
+    {"id": "relay_2", "expander": "relay_exp", "pin": 1, "active_high": false, "label": "Реле 2 (вент. випарника)"},
+    {"id": "relay_3", "expander": "relay_exp", "pin": 2, "active_high": false, "label": "Реле 3 (вент. конденсатора)"},
+    {"id": "relay_4", "expander": "relay_exp", "pin": 3, "active_high": false, "label": "Реле 4 (відтайка)"},
+    {"id": "relay_5", "expander": "relay_exp", "pin": 4, "active_high": false, "label": "Реле 5 (освітлення)"},
+    {"id": "relay_6", "expander": "relay_exp", "pin": 5, "active_high": false, "label": "Реле 6 (резерв)"}
+  ],
+  "stepper_outputs": [
+    {"id": "eev_port_1", "expander": "input_exp", "step_pin": 2, "dir_pin": 3, "label": "Степер порт 1"},
+    {"id": "eev_port_2", "expander": "input_exp", "step_pin": 4, "dir_pin": 5, "label": "Степер порт 2"}
   ],
   "expander_inputs": [
-    {"id": "din_1", "expander": "input_exp", "pin": 0, "invert": true, "label": "DI1"},
-    {"id": "din_2", "expander": "input_exp", "pin": 1, "invert": true, "label": "DI2"},
-    {"id": "din_3", "expander": "input_exp", "pin": 2, "invert": true, "label": "DI3"},
-    {"id": "din_4", "expander": "input_exp", "pin": 3, "invert": true, "label": "DI4"},
-    {"id": "din_5", "expander": "input_exp", "pin": 4, "invert": true, "label": "DI5"},
-    {"id": "din_6", "expander": "input_exp", "pin": 5, "invert": true, "label": "DI6"}
+    {"id": "din_1", "expander": "input_exp", "pin": 0, "invert": true, "label": "Вхід 1 (двері)"},
+    {"id": "din_2", "expander": "input_exp", "pin": 1, "invert": true, "label": "Вхід 2 (нічний)"},
+    {"id": "din_3", "expander": "input_exp", "pin": 2, "invert": true, "label": "Вхід 3 / EEV STEP z1 (mod: зняти оптопару)"},
+    {"id": "din_4", "expander": "input_exp", "pin": 3, "invert": true, "label": "Вхід 4 / EEV DIR z1 (mod: зняти оптопару)"},
+    {"id": "din_5", "expander": "input_exp", "pin": 4, "invert": true, "label": "Вхід 5 / EEV STEP z2 (mod: зняти оптопару)"},
+    {"id": "din_6", "expander": "input_exp", "pin": 5, "invert": true, "label": "Вхід 6 / EEV DIR z2 (mod: зняти оптопару)"}
   ],
   "onewire_buses": [
-    {"id": "ow_1", "gpio": 32, "label": "OW1"},
-    {"id": "ow_2", "gpio": 33, "label": "OW2"}
+    {"id": "ow_1", "gpio": 32, "label": "OneWire шина 1"},
+    {"id": "ow_2", "gpio": 33, "label": "OneWire шина 2"}
   ],
   "adc_channels": [
-    {"id": "adc_1", "gpio": 36, "atten": 3, "label": "ADC1"},
-    {"id": "adc_2", "gpio": 39, "atten": 3, "label": "ADC2"},
-    {"id": "adc_3", "gpio": 34, "atten": 3, "label": "ADC3"},
-    {"id": "adc_4", "gpio": 35, "atten": 3, "label": "ADC4"}
+    {"id": "adc_1", "gpio": 36, "atten": 3, "label": "ADC 1 — тиск всмоктування (Carel SPKT 0.5-4.5V)"},
+    {"id": "adc_2", "gpio": 39, "atten": 3, "label": "ADC 2 — тиск нагнітання"},
+    {"id": "adc_3", "gpio": 34, "atten": 3, "label": "ADC 3"},
+    {"id": "adc_4", "gpio": 35, "atten": 3, "label": "ADC 4"}
   ],
   "dac_channels": [
-    {"id": "dac_1", "gpio": 25, "label": "DAC1"},
-    {"id": "dac_2", "gpio": 26, "label": "DAC2"}
+    {"id": "dac_1", "gpio": 25, "label": "Аналог 0-10V (1)"},
+    {"id": "dac_2", "gpio": 26, "label": "Аналог 0-10V (2)"}
   ],
   "uart_buses": [
-    {"id": "rs485_1", "tx_gpio": 27, "rx_gpio": 14, "label": "RS485"},
-    {"id": "rs485_2", "tx_gpio": 17, "rx_gpio": 16, "label": "RS485-EXP"}
+    {"id": "rs485_1", "tx_gpio": 27, "rx_gpio": 14, "label": "RS-485 Modbus Slave (MAX13487, auto DE)"},
+    {"id": "rs485_2", "tx_gpio": 17, "rx_gpio": 16, "label": "RS-485 Expansion Master (потрібен 2-й трансивер)"}
   ]
 }

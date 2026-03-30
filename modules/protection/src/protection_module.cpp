@@ -34,6 +34,13 @@ ProtectionModule::ProtectionModule()
     : BaseModule("protection", modesp::ModulePriority::HIGH)
 {}
 
+ProtectionModule::ProtectionModule(const char* ns,
+                                   etl::span<const modesp::InputBinding> inputs,
+                                   bool primary)
+    : BaseModule("protection", ns, modesp::ModulePriority::HIGH, inputs),
+      is_primary_(primary)
+{}
+
 // ═══════════════════════════════════════════════════════════════
 // Sync settings з SharedState (WebUI/API може їх змінити)
 // ═══════════════════════════════════════════════════════════════
@@ -155,7 +162,7 @@ void ProtectionModule::on_update(uint32_t dt_ms) {
     // HAL alarm блокується тільки в heating-фазах: stabilize, valve_open, active, equalize
     bool defrost_heating = false;
     if (defrost) {
-        auto phase_val = state_get("defrost.phase");
+        auto phase_val = state_get(resolve_input("defrost.phase"));
         if (phase_val.has_value()) {
             const auto* sp = etl::get_if<etl::string<32>>(&phase_val.value());
             if (sp && (*sp == "active" || *sp == "stabilize" ||
@@ -235,8 +242,8 @@ void ProtectionModule::on_update(uint32_t dt_ms) {
     if (has_feature("door_protection")) {
         update_door_alarm(door_open, dt_ms);
 
-        // Door → compressor delay: block compressor if door open too long
-        if (door_open) {
+        // Door → compressor delay: block compressor if door open too long (primary only)
+        if (is_primary_ && door_open) {
             door_comp_timer_ms_ += dt_ms;
             if (door_comp_timer_ms_ >= door_comp_delay_ms_ && !door_comp_blocked_) {
                 door_comp_blocked_ = true;
@@ -253,14 +260,14 @@ void ProtectionModule::on_update(uint32_t dt_ms) {
         state_set(ns_key("door_comp_blocked"), door_comp_blocked_);
     }
 
-    // 6. Condenser temperature protection
-    if (read_input_bool("equipment.has_cond_temp")) {
+    // 6. Condenser temperature protection (primary only — shared hardware)
+    if (is_primary_ && read_input_bool("equipment.has_cond_temp")) {
         float cond_temp = read_input_float("equipment.cond_temp");
         update_condenser_alarm(cond_temp, true, dt_ms);
     }
 
-    // 6b. Pressure protection (Block G — HP/LP)
-    {
+    // 6b. Pressure protection (Block G — HP/LP, primary only — shared hardware)
+    if (is_primary_) {
         bool has_p = read_input_bool("equipment.has_suction_p");
         if (has_p) {
             float suction = read_input_float("equipment.suction_bar");
@@ -271,8 +278,8 @@ void ProtectionModule::on_update(uint32_t dt_ms) {
         }
     }
 
-    // 7. Компресорний захист
-    if (has_feature("compressor_protection")) {
+    // 7. Компресорний захист (only primary instance — compressor is shared)
+    if (is_primary_ && has_feature("compressor_protection")) {
         bool compressor_on = read_input_bool("equipment.compressor");
         update_compressor_tracker(compressor_on, air_temp, defrost, dt_ms);
 

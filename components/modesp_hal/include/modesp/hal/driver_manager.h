@@ -68,6 +68,9 @@ private:
     IActuatorDriver* create_actuator(const Binding& binding, HAL& hal);
     IActuatorDriver* create_pcf_actuator(const Binding& binding, HAL& hal);
     IActuatorDriver* create_eev_pcf_stepper(const Binding& binding, HAL& hal);
+    IActuatorDriver* create_eev_analog(const Binding& binding, HAL& hal);
+    IActuatorDriver* create_eev_stepper(const Binding& binding, HAL& hal);
+    IActuatorDriver* create_akv_pulse(const Binding& binding, HAL& hal);
     ISensorDriver*   create_pcf_sensor(const Binding& binding, HAL& hal);
 };
 

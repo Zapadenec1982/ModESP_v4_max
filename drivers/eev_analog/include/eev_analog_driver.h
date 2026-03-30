@@ -28,6 +28,13 @@ public:
     /// @param max_steps  Logical resolution (default 255 for 8-bit DAC)
     EevAnalogDriver(const char* role, int dac_gpio, uint16_t max_steps = 255);
 
+    /// Configure after pool allocation (used by DriverManager)
+    void configure(const char* role, int dac_gpio, uint16_t max_steps = 255) {
+        role_ = role;
+        dac_gpio_ = dac_gpio;
+        max_steps_ = max_steps;
+    }
+
     // ── IValveDriver ──
     bool     set_position(uint16_t target) override;
     uint16_t get_position() const override { return position_; }

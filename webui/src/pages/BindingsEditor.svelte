@@ -18,19 +18,23 @@
 
   // Поточні bindings (завантажуються з /api/bindings)
   let bindings = [];
+  let loadedBindings = [];  // immutable snapshot — preserves bindings not visible in UI
   let loading = true;
   let error = null;
   let saving = false;
   let needsRestart = false;
+  let initialActiveZones = null;
 
   onMount(async () => {
     try {
       const data = await apiGet('/api/bindings');
-      bindings = data.bindings || [];
+      loadedBindings = data.bindings || [];
+      bindings = [...loadedBindings];
     } catch (e) {
       error = e.message;
     } finally {
       loading = false;
+      initialActiveZones = parseInt($state['equipment.active_zones']) || 1;
     }
   });
 
@@ -131,6 +135,7 @@
   $: hasNtc = !!$state['equipment.has_ntc_driver'];
   // Zone-aware filtering: hide zone 2+ roles when active_zones < 2
   $: activeZones = parseInt($state['equipment.active_zones']) || 1;
+  $: zonesChanged = initialActiveZones !== null && activeZones !== initialActiveZones;
   $: unassignedRoles = roles
     .filter(r => !assignedRoles.has(r.role))
     .filter(r => !r.zone_min || r.zone_min <= activeZones)
@@ -147,9 +152,12 @@
     saving = true;
     error = null;
     try {
+      // Preserve bindings for roles not visible in UI (e.g., orphaned or zone-filtered)
+      const currentRoles = new Set(bindings.map(b => b.role));
+      const preserved = loadedBindings.filter(b => !currentRoles.has(b.role));
       const res = await apiPost('/api/bindings', {
         manifest_version: 1,
-        bindings: bindings,
+        bindings: [...bindings, ...preserved],
       });
       if (res.needs_restart) needsRestart = true;
     } catch (e) {
@@ -186,6 +194,12 @@
 
   {#if error}
     <div class="error-banner">{error}</div>
+  {/if}
+
+  {#if zonesChanged}
+    <div class="warning-banner">
+      {$t['bind.zones_changed'] || 'Зміна кількості зон потребує перезавантаження після збереження.'}
+    </div>
   {/if}
 
   {#if missingRequired.length > 0}

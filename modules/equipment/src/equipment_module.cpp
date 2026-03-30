@@ -35,6 +35,9 @@ EquipmentModule::EquipmentModule()
 // ═══════════════════════════════════════════════════════════════
 
 void EquipmentModule::bind_drivers(modesp::DriverManager& dm) {
+    // zone_count_ set by main.cpp via set_zone_count() before this call
+    // (module has no SharedState access yet — not registered)
+
     // Обов'язкові
     sensor_air_  = dm.find_sensor("air_temp");
     compressor_  = dm.find_actuator("compressor");
@@ -108,13 +111,20 @@ void EquipmentModule::bind_drivers(modesp::DriverManager& dm) {
 
         ESP_LOGI(TAG, "Multi-zone: %d zones configured", (int)zone_count_);
         for (size_t z = 0; z < zone_count_; z++) {
-            ESP_LOGI(TAG, "  Zone %d: evap=%s press=%s defr=%s efan=%s eev=%s",
-                     (int)(z + 1),
-                     zones_[z].evap_sensor     ? "OK" : "-",
-                     zones_[z].pressure_sensor ? "OK" : "-",
-                     zones_[z].defrost_relay   ? "OK" : "-",
-                     zones_[z].evap_fan        ? "OK" : "-",
-                     zones_[z].eev_driver      ? "OK" : "-");
+            bool any_hw = zones_[z].evap_sensor || zones_[z].pressure_sensor ||
+                          zones_[z].defrost_relay || zones_[z].evap_fan ||
+                          zones_[z].eev_driver;
+            if (any_hw) {
+                ESP_LOGI(TAG, "  Zone %d: evap=%s press=%s defr=%s efan=%s eev=%s",
+                         (int)(z + 1),
+                         zones_[z].evap_sensor     ? "OK" : "-",
+                         zones_[z].pressure_sensor ? "OK" : "-",
+                         zones_[z].defrost_relay   ? "OK" : "-",
+                         zones_[z].evap_fan        ? "OK" : "-",
+                         zones_[z].eev_driver      ? "OK" : "-");
+            } else {
+                ESP_LOGI(TAG, "  Zone %d: shared evaporator (no per-zone hardware)", (int)(z + 1));
+            }
         }
     }
 }

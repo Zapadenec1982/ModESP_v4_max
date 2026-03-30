@@ -34,9 +34,8 @@ private:
     bool parse_bindings_json();
 
     // JSON parsing limits (static buffers in BSS — не впливає на стек)
-    // KC868-A6 board.json ~2.3KB, ~240 jsmn tokens
-    // Запас: 3072 = 34% над 2.3KB, 350 = 46% над 240 tokens
-    static constexpr size_t MAX_JSON_SIZE = 3072;
+    // KC868-A6 board.json ~3.4KB with stepper_outputs, ~280 jsmn tokens
+    static constexpr size_t MAX_JSON_SIZE = 4096;
     static constexpr size_t MAX_TOKENS    = 350;
 };
 
