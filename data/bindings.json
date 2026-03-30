@@ -6,8 +6,11 @@
     {"hardware": "relay_3", "driver": "pcf8574_relay", "role": "cond_fan",      "module": "equipment"},
     {"hardware": "relay_4", "driver": "pcf8574_relay", "role": "defrost_relay", "module": "equipment"},
     {"hardware": "relay_5", "driver": "pcf8574_relay", "role": "light",         "module": "equipment"},
-    {"hardware": "ow_1",    "driver": "ds18b20",       "role": "air_temp",      "module": "equipment", "address": "28:40:0A:45:D4:72:7E:F0"},
-    {"hardware": "din_1",   "driver": "pcf8574_input",  "role": "door_contact", "module": "equipment"},
-    {"hardware": "din_2",   "driver": "pcf8574_input",  "role": "night_input",  "module": "equipment"}
+    {"hardware": "ow_1",    "driver": "ds18b20",       "role": "air_temp",      "module": "equipment", "address": "28:8C:5E:45:D4:08:44:09"},
+    {"hardware": "ow_1",    "driver": "ds18b20",       "role": "evap_temp",     "module": "equipment", "address": "28:40:0A:45:D4:72:7E:F0"},
+    {"hardware": "din_1",   "driver": "pcf8574_input", "role": "door_contact",  "module": "equipment"},
+    {"hardware": "din_2",   "driver": "pcf8574_input", "role": "night_input",   "module": "equipment"},
+    {"hardware": "adc_1",   "driver": "pressure_adc",  "role": "suction_p",     "module": "equipment"},
+    {"hardware": "eev_step_1", "driver": "eev_pcf8574_stepper", "role": "eev",  "module": "equipment"}
   ]
 }
