@@ -129,8 +129,11 @@
   $: assignedActuators = roles.filter(r => r.type === 'actuator' && assignedRoles.has(r.role));
 
   $: hasNtc = !!$state['equipment.has_ntc_driver'];
+  // Zone-aware filtering: hide zone 2+ roles when active_zones < 2
+  $: activeZones = parseInt($state['equipment.active_zones']) || 1;
   $: unassignedRoles = roles
     .filter(r => !assignedRoles.has(r.role))
+    .filter(r => !r.zone_min || r.zone_min <= activeZones)
     .filter(r => availableHw(r).length > 0);
 
   // ── Save / Restart ──

@@ -1469,14 +1469,22 @@ class UIJsonGenerator:
                 if drv.get("requires_address", False):
                     requires_address = True
 
+            # Zone metadata: _z2 roles need active_zones >= 2
+            role_name = req["role"]
+            zone_min = 0  # global
+            if "_z4" in role_name: zone_min = 4
+            elif "_z3" in role_name: zone_min = 3
+            elif "_z2" in role_name: zone_min = 2
+
             role_entry = {
-                "role": req["role"],
+                "role": role_name,
                 "type": req["type"],
                 "drivers": drivers,
                 "hw_types": hw_types,
                 "requires_address": requires_address,
                 "label": req.get("label", req["role"]),
                 "optional": req.get("optional", False),
+                "zone_min": zone_min,
             }
             # Backward compat: single driver → також emit driver/hw_type
             if len(drivers) == 1:

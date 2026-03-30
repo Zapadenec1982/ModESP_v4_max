@@ -306,15 +306,32 @@ extern "C" void app_main(void)
     // Protection — моніторинг аварій (HIGH priority, перед thermostat)
     app.modules().register_module(protection);
 
-    // Thermostat + Defrost + EEV — always 2 zones compiled in.
-    // Zone 2 activation is runtime via equipment.active_zones (WebUI toggle).
-    // Equipment reads active_zones from NVS at init and sets zone_count.
+    // Thermostat + Defrost + EEV — Zone 1 always, Zone 2 conditional.
+    // equipment.active_zones persisted in NVS, restored by PersistService in Phase 1.
+    // Zone change requires restart (промисловий стандарт: Danfoss/CAREL теж).
     app.modules().register_module(thermostat_z1);
     app.modules().register_module(defrost_z1);
     app.modules().register_module(eev_z1);
-    app.modules().register_module(thermostat_z2);
-    app.modules().register_module(defrost_z2);
-    app.modules().register_module(eev_z2);
+
+    // Zone 2 — conditional registration based on persisted active_zones
+    {
+        int32_t active_zones = 1;
+        auto val = app.state().get("equipment.active_zones");
+        if (val.has_value()) {
+            const auto* iv = etl::get_if<int32_t>(&val.value());
+            if (iv) active_zones = *iv;
+        }
+        if (active_zones >= 2) {
+            app.modules().register_module(thermostat_z2);
+            app.modules().register_module(defrost_z2);
+            app.modules().register_module(eev_z2);
+            ESP_LOGI(TAG, "Zone 2 modules registered (active_zones=%ld)",
+                     static_cast<long>(active_zones));
+        } else {
+            ESP_LOGI(TAG, "Single zone mode (active_zones=%ld)",
+                     static_cast<long>(active_zones));
+        }
+    }
 
     // Lighting — освітлення камери (NORMAL priority)
     app.modules().register_module(lighting);
