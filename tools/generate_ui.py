@@ -541,6 +541,7 @@ BOARD_SECTION_TO_HW_TYPE = {
     "gpio_inputs": "gpio_input",
     "onewire_buses": "onewire_bus",
     "adc_channels": "adc_channel",
+    "dac_channels": "dac_channel",
     "pwm_channels": "pwm_channel",
     "i2c_buses": "i2c_bus",
     "expander_outputs": "i2c_expander_output",
