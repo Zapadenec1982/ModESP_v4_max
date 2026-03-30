@@ -54,8 +54,8 @@ Verified on ESP32 + KC868-A6 board with real refrigeration equipment:
 | Metric | Value |
 |--------|-------|
 | State keys | 126 (63 metadata, 50 MQTT pub, 62 MQTT sub) |
-| Modules | 5 (equipment, thermostat, defrost, protection, datalogger) |
-| Drivers | 6 (DS18B20, NTC, relay, digital input, PCF8574 relay/input) |
+| Modules | 7 (equipment, thermostat, defrost, protection, eev, lighting, datalogger) |
+| Drivers | 11 (DS18B20, NTC, relay, digital input, PCF8574 relay/input, pressure ADC, EEV analog/stepper/PCF8574, AKV pulse) |
 | HTTP endpoints | 23 REST + WebSocket + OTA |
 | Tests | 491 (310 pytest + 181 C++ host / 418 assertions) |
 | WebUI | 80 KB gzipped, Svelte 4, dark/light theme, 4 languages |
@@ -260,7 +260,7 @@ modules/
 ├── defrost/            # 7-phase FSM, 3 types, 4 initiations
 ├── protection/         # 10 monitors, CompressorTracker, 2-level escalation
 └── datalogger/         # 6-ch temperature + 18 event types (LittleFS)
-drivers/                # 6 drivers: ds18b20, ntc, relay, digital_input, pcf8574_*
+drivers/                # 11 drivers: ds18b20, ntc, relay, digital_input, pcf8574_*, pressure_adc, eev_analog/stepper/pcf8574, akv_pulse
 webui/                  # Svelte 4 source
 tools/                  # Python generator + 310 pytest tests
 tests/host/             # 181 C++ doctest tests

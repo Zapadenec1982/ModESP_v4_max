@@ -13,8 +13,8 @@
 | State keys | 126 total (63 STATE_META entries) |
 | MQTT topics | 50 publish, 62 subscribe |
 | HTTP endpoints | 23 REST + OTA upload |
-| Modules | 5 (equipment, thermostat, defrost, protection, datalogger) |
-| Drivers | 6 (DS18B20, NTC, relay, digital input, PCF8574 relay, PCF8574 input) |
+| Modules | 7 (equipment, thermostat, defrost, protection, eev, lighting, datalogger) |
+| Drivers | 11 (DS18B20, NTC, relay, digital input, PCF8574 relay/input, pressure ADC, EEV analog/stepper/PCF8574 stepper, AKV pulse) |
 | Tests | 491 total (181 host C++ / 418 assertions + 310 pytest) |
 | WebUI | 80KB gzipped (Svelte 4, dark/light theme) |
 | Firmware binary | ~1.2MB, free heap 77–90KB operational |

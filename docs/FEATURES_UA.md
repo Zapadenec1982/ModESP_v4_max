@@ -11,8 +11,8 @@
 | Показник | Значення |
 |----------|----------|
 | Ключі стану | 126 (63 STATE_META, 50 MQTT publish, 62 MQTT subscribe) |
-| Модулі | 5 (equipment, thermostat, defrost, protection, datalogger) |
-| Драйвери | 6 (ds18b20, ntc, relay, digital_input, pcf8574_relay, pcf8574_input) |
+| Модулі | 7 (equipment, thermostat, defrost, protection, eev, lighting, datalogger) |
+| Драйвери | 11 (ds18b20, ntc, relay, digital_input, pcf8574_relay/input, pressure_adc, eev_analog/stepper/pcf8574_stepper, akv_pulse) |
 | HTTP-ендпоінти | 23 REST + OTA upload |
 | Тести | 491 (181 host C++ doctest / 418 assertions + 310 pytest) |
 | WebUI | 80KB gzip (64KB JS + 16KB CSS), Svelte 4 |
@@ -342,15 +342,17 @@ manifest.json → Python generator → ui.json + C++ headers → idf.py build
 
 ## 11. Підтримка обладнання
 
-Підтримка плати KC868-A6 та периферії через 6 драйверів.
+Підтримка плати KC868-A6 та периферії через 11 драйверів.
 
 ### Плата KC868-A6
 
 - **MCU** — ESP32-WROOM-32, 4MB flash
 - **Relay** — 6 каналів (через PCF8574 I2C)
 - **Digital input** — 6 каналів (через PCF8574 I2C)
-- **Аналогові входи** — NTC-термістори
-- **1-Wire** — DS18B20 цифрові датчики температури
+- **DAC** — 2 канали 0-10V (GPIO25, GPIO26) для аналогового EEV
+- **ADC** — 4 канали (тиск всмоктування/нагнітання, резерв)
+- **1-Wire** — 2 шини DS18B20 цифрових датчиків температури
+- **Stepper ports** — 2 порти step+dir на PCF8574 (для степерних EEV клапанів)
 
 ### Драйвери
 
@@ -358,10 +360,15 @@ manifest.json → Python generator → ui.json + C++ headers → idf.py build
 |---------|-----|----------|
 | **ds18b20** | Температурний датчик | 1-Wire |
 | **ntc** | Температурний датчик (термістор) | ADC |
+| **pressure_adc** | Датчик тиску (0.5-4.5V) | ADC |
 | **relay** | GPIO relay | GPIO |
 | **digital_input** | Дискретний вхід | GPIO |
 | **pcf8574_relay** | I2C relay (PCF8574) | I2C |
 | **pcf8574_input** | I2C вхід (PCF8574) | I2C |
+| **eev_analog** | EEV клапан 0-10V (DAC) | DAC |
+| **eev_stepper** | EEV степер (TMC2209/DRV8825) | GPIO |
+| **eev_pcf8574_stepper** | EEV степер через PCF8574 | I2C |
+| **akv_pulse** | PWM соленоїд (Danfoss AKV) | GPIO |
 
 ### Конфігурація плати
 

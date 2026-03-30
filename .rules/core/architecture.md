@@ -154,3 +154,32 @@ Compile-time alternative to Mosquitto via Kconfig `MODESP_CLOUD_BACKEND`.
 - Build: `cd webui && npm run build && npm run deploy`
 - Output: `data/www/bundle.js.gz` (~63KB) + `bundle.css.gz` (~13KB)
 - Premium dark theme, bento-card dashboard, responsive accordions
+
+## Multi-Zone Architecture (InputBindings)
+
+Зони реалізовані через InputBindings — масив ремапінгу ключів SharedState.
+Кожен zone module отримує свій набір bindings при інстанціації в main.cpp.
+
+**Принцип:** module код читає `read_input_float("equipment.air_temp")`,
+InputBinding автоматично ремапить на `equipment.air_temp_z2` для Zone 2.
+
+**Per-zone instances (main.cpp):**
+- Thermostat: thermo_z1, thermo_z2 (кожен з своїми InputBindings)
+- Defrost: defrost_z1, defrost_z2
+- EEV: eev_z1, eev_z2
+- Protection: protection (primary, compressor tracker), protection_z2 (secondary, temp alarms only)
+
+**Zone 2 conditional registration:**
+```cpp
+int32_t active_zones = app.state().get("equipment.active_zones");
+if (active_zones >= 2) {
+    app.modules().register_module(protection_z2);
+    app.modules().register_module(thermostat_z2);
+    // ...
+}
+```
+
+**HAL розширення (2026-03-30):**
+- `DacChannelResource` + `find_dac_channel()` — DAC 0-10V для EEV analog
+- `StepperOutputConfig` + `find_stepper_output()` — згруповані step+dir пари
+- `stepper_outputs` секція в board.json — окремий hw_type `i2c_expander_stepper`

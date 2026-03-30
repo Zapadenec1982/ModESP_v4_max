@@ -34,6 +34,15 @@
 - [x] Smooth Lines (dynamic SH setpoint by cabinet T, proportional)
 - [x] RS-485 Modbus Master (UART2, 8 slaves, poll+coil write, auto online/offline)
 
+## Tech Debt Elimination (completed 2026-03-30)
+
+12 fixes applied across zones, HAL, bindings, protection, and UI:
+- Multi-zone InputBindings architecture, per-zone module instances
+- HAL: DacChannelResource, StepperOutputConfig, stepper_outputs in board.json
+- Bindings fixes, protection zone separation, UI zone cards
+
+**Next:** documentation sync, testing, production preparation.
+
 ## Current state
 
 - 7 modules (equipment, thermostat, defrost, protection, eev, lighting, datalogger), 9+ drivers

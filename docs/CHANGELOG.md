@@ -2,6 +2,41 @@
 
 > Повний changelog проекту.
 
+## 2026-03-30
+
+### refactor(tech-debt): 12 fixes — zones, HAL, bindings, protection, UI
+
+**Zone 2 architecture:**
+- fix: `set_zone_count()` before `bind_drivers()` — zone 2 sensors now properly bound
+- feat: DAC channel support in HAL (`DacChannelResource`, `find_dac_channel`)
+- feat: `eev_analog` driver registered in DriverManager factory
+- feat: per-zone Protection via InputBindings (primary=compressor tracker, secondary=temp alarms only)
+- data: `air_temp_z2` binding added to `bindings.json` (OW2, DS18B20)
+
+**Hardware filtering & stepper grouping:**
+- refactor: `stepper_outputs` section in `board.json` — `eev_port_1/2` as step+dir pairs
+- refactor: `eev_pcf8574_stepper` hw_type → `i2c_expander_stepper` (separates from relay)
+- fix: DriverManager uses `find_stepper_output()` instead of `dir=step+1` hack
+- fix: `relay_7/8` removed (KC868-A6 has 6 physical relays)
+- fix: `board.json` parse buffer 3072→4096 (exceeded by stepper_outputs + labels)
+
+**Driver registration:**
+- feat: `eev_stepper` + `akv_pulse` factory branches + `configure()` methods
+- feat: `eev_analog` `configure()` for pool allocation
+
+**WebUI:**
+- fix: BindingsEditor preserves invisible bindings on save (`loadedBindings` merge)
+- feat: restart notification when `active_zones` changes
+- refactor: access level selector moved from DynamicPage to Layout sidebar
+- feat: `ZoneCard` component for Dashboard
+
+**Other:**
+- refactor: `BaseModule::resolve_input()` moved to protected
+- fix: equipment log "shared evaporator" instead of misleading "evap=- press=-"
+- feat: `generate_ui.py` stepper_outputs → `i2c_expander_stepper` mapping
+
+**Files changed:** 25 files, +994/-606 lines
+
 ## 2026-03-28
 
 - **fix(eev): superheat calculation — dew point для зеотропних сумішей:**
