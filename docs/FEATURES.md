@@ -10,13 +10,13 @@
 
 | Metric | Value |
 |--------|-------|
-| State keys | 126 total (63 STATE_META entries) |
-| MQTT topics | 50 publish, 62 subscribe |
+| State keys | 231 state keys (178 STATE_META entries) |
+| MQTT topics | 107 publish, 166 subscribe |
 | HTTP endpoints | 23 REST + OTA upload |
 | Modules | 7 (equipment, thermostat, defrost, protection, eev, lighting, datalogger) |
 | Drivers | 11 (DS18B20, NTC, relay, digital input, PCF8574 relay/input, pressure ADC, EEV analog/stepper/PCF8574 stepper, AKV pulse) |
 | Tests | 491 total (181 host C++ / 418 assertions + 310 pytest) |
-| WebUI | 80KB gzipped (Svelte 4, dark/light theme) |
+| WebUI | 83KB gzipped (Svelte 4, dark/light theme) |
 | Firmware binary | ~1.2MB, free heap 77–90KB operational |
 | License | PolyForm Noncommercial 1.0.0 |
 
@@ -45,7 +45,7 @@ Industrial thermostat and defrost logic purpose-built for commercial refrigerati
 - **Safety run** — timed compressor cycling on sensor failure to prevent product loss
 
 ### Defrost
-- **7-phase FSM** — idle, pre-drip, heating, drip, fan delay, post-drip, recovery
+- **8-phase FSM** — IDLE, PUMP_DOWN, STABILIZE, VALVE_OPEN, ACTIVE, EQUALIZE, DRIP, FAD
 - **3 defrost types** — natural (off-cycle), electric heater, hot-gas
 - **4 initiation modes** — timed interval, adaptive (based on evaporator frost accumulation), manual, external trigger
 - **Module interaction** — defrost suspends thermostat cooling; equipment manager arbitrates relay conflicts
@@ -105,7 +105,7 @@ On-device telemetry recording with chart generation — no cloud dependency requ
 
 ## 6. Web Interface
 
-Embedded Svelte 4 SPA served from flash — 80KB gzipped (64KB JS + 16KB CSS).
+Embedded Svelte 4 SPA served from flash — 83KB gzipped (69KB JS + 14KB CSS).
 
 ### Pages
 | Page | Description |
@@ -208,7 +208,7 @@ Board abstraction layer — switch hardware by changing one JSON file, zero code
 ### Supported Board
 | Board | I/O | Interface |
 |-------|-----|-----------|
-| **KC868-A6** | 6 relay outputs, 6 digital inputs | GPIO + PCF8574 I2C |
+| **KC868-A6** | 6 relay outputs, 6 digital inputs, 2 DAC (0-10V), 4 ADC, 2 OneWire buses, 2 stepper ports (via PCF8574) | GPIO + PCF8574 I2C |
 
 ### Drivers
 
@@ -249,7 +249,7 @@ From manifest edit to running firmware in three commands — no manual wiring of
 | **Framework** | ESP-IDF 5.5, FreeRTOS |
 | **Language** | C++17 |
 | **Containers** | ETL (Embedded Template Library) — zero heap allocation |
-| **WebUI** | Svelte 4, Vite (build only), 80KB gzipped |
+| **WebUI** | Svelte 4, Vite (build only), 83KB gzipped |
 | **Storage** | NVS (parameters), LittleFS (datalog), SPIFFS (WebUI) |
 | **Connectivity** | WiFi (STA/AP), MQTT + TLS, HTTP REST, WebSocket, mDNS |
 | **Cloud** | ModESP Cloud (default) or AWS IoT Core (compile-time) |
@@ -267,12 +267,12 @@ From manifest edit to running firmware in three commands — no manual wiring of
                     │                                              │
   ┌──────────┐     │  ┌──────────┐  ┌───────────┐  ┌──────────┐  │
   │ DS18B20  │◄───►│  │Equipment │  │Thermostat │  │ Defrost  │  │
-  │ NTC      │     │  │ Manager  │  │  4-state  │  │ 7-phase  │  │
+  │ NTC      │     │  │ Manager  │  │  4-state  │  │ 8-phase  │  │
   └──────────┘     │  │  (HAL)   │  │   FSM     │  │   FSM    │  │
                    │  └────┬─────┘  └─────┬─────┘  └────┬─────┘  │
   ┌──────────┐     │       │              │              │        │
   │  Relay   │◄───►│  ┌────▼──────────────▼──────────────▼────┐   │
-  │  PCF8574 │     │  │         State Engine (126 keys)       │   │
+  │  PCF8574 │     │  │         State Engine (231 keys)       │   │
   │  GPIO    │     │  └────┬──────────┬──────────┬────────────┘   │
   └──────────┘     │       │          │          │                │
                    │  ┌────▼────┐ ┌───▼────┐ ┌──▼─────────┐      │

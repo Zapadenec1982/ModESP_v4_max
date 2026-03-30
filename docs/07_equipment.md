@@ -10,9 +10,12 @@ IActuatorDriver). Бізнес-модулі (Thermostat, Defrost, Protection) с
 
 - **Priority:** CRITICAL (0) — ініціалізується першим, оновлюється першим
 - **Bind:** `bind_drivers(DriverManager&)` — знаходить drivers за role name з bindings.json
+- **Bind:** `set_zone_count(n)` + `bind_drivers(DriverManager&)` — main.cpp передає zone count ДО bind
 - **Обов'язкові drivers:** `air_temp` (sensor), `compressor` (actuator)
 - **Опціональні drivers:** evap_temp, condenser_temp, defrost_relay, evap_fan, cond_fan,
-  door_contact, night_input
+  door_contact, night_input, light, suction_p, discharge_p, eev
+- **Per-zone drivers (zone_count >= 2):** air_temp_z2, evap_temp_z1/z2, suction_p_z1/z2,
+  defrost_relay_z1/z2, evap_fan_z1/z2, eev_z1/z2
 
 ### Цикл on_update (кожна ітерація main loop)
 
@@ -129,15 +132,24 @@ Runtime ланцюг: Bindings page -> Save -> Restart -> equipment.has_* = true
 
 | Role | Type | Driver | Optional | Опис |
 |------|------|--------|----------|------|
-| `air_temp` | sensor | ds18b20, ntc | **Ні** | Температура камери |
+| `air_temp` | sensor | ds18b20, ntc | **Ні** | Температура камери (= Zone 1) |
 | `compressor` | actuator | relay, pcf8574_relay | **Ні** | Компресор |
 | `evap_temp` | sensor | ds18b20, ntc | Так | Температура випарника |
 | `condenser_temp` | sensor | ds18b20, ntc | Так | Температура конденсатора |
-| `defrost_relay` | actuator | relay, pcf8574_relay | Так | Реле відтайки (тен або клапан ГГ) |
+| `defrost_relay` | actuator | relay, pcf8574_relay | Так | Реле відтайки |
 | `evap_fan` | actuator | relay, pcf8574_relay | Так | Вентилятор випарника |
 | `cond_fan` | actuator | relay, pcf8574_relay | Так | Вентилятор конденсатора |
 | `door_contact` | sensor | digital_input, pcf8574_input | Так | Контакт дверей |
 | `night_input` | sensor | digital_input, pcf8574_input | Так | Вхід нічного режиму |
+| `light` | actuator | relay, pcf8574_relay | Так | Освітлення камери |
+| `suction_p` | sensor | pressure_adc | Так | Тиск всмоктування |
+| `discharge_p` | sensor | pressure_adc | Так | Тиск нагнітання |
+| `eev` | actuator | eev_analog, eev_stepper, eev_pcf8574_stepper, akv_pulse | Так | EEV клапан |
+| `air_temp_z2` | sensor | ds18b20, ntc | Так | Температура камери Zone 2 |
+| `air_temp_backup` | sensor | ds18b20, ntc | Так | Резервний датчик камери |
+
+Per-zone roles (zone_min=2, видимі при active_zones >= 2):
+evap_temp_z1/z2, suction_p_z1/z2, defrost_relay_z1/z2, evap_fan_z1/z2, eev_z1/z2
 
 ### State keys (повна таблиця)
 
@@ -183,19 +195,47 @@ equipment.compressor, equipment.defrost_relay, equipment.sensor1_ok
 **Subscribe:** equipment.ntc_beta, equipment.ntc_r_series, equipment.ntc_r_nominal,
 equipment.ds18b20_offset, equipment.filter_coeff
 
+### Multi-Zone Architecture
+
+Equipment підтримує 1-4 зони (runtime через `equipment.active_zones`).
+Zone 1 = primary (завжди активна), Zone 2+ = optional (потребує restart).
+
+**Ініціалізація (main.cpp):**
+1. `equipment.set_zone_count(active_zones)` — передає кількість зон ДО bind_drivers
+2. `equipment.bind_drivers(dm)` — прив'язує per-zone sensors/actuators
+3. Zone 2 modules реєструються умовно: thermostat_z2, defrost_z2, eev_z2, protection_z2
+
+**InputBindings:** кожен zone module отримує масив ремапінгу ключів SharedState.
+Module код читає `read_input_float("equipment.air_temp")` — InputBinding автоматично
+ремапить на `equipment.air_temp_z2` для Zone 2 instance.
+
+**Per-zone sensors в on_update():**
+```
+if (zone_count_ >= 2) {
+    zones_[z].air_sensor->read(val) → state_set("equipment.air_temp_z2", val)
+}
+```
+
+**HAL extensions (2026-03-30):**
+- `DacChannelResource` — DAC 0-10V для аналогового EEV
+- `StepperOutputConfig` — згруповані step+dir пари (замість окремих pins)
+- `stepper_outputs` секція в board.json → hw_type `i2c_expander_stepper`
+
 ---
 
 ## Protection Module (protection_module)
 
 ### Архітектура
 
-Protection module моніторить 10 незалежних аварій і публікує стан через SharedState.
-Не зупиняє обладнання напряму — `protection.lockout` зарезервований (завжди false).
+Protection module моніторить 10+ незалежних аварій і публікує стан через SharedState.
+`protection.lockout` = permanent lockout після вичерпання max_retries (2-рівнева ескалація).
+`protection.compressor_blocked` = примусова зупинка компресора (forced off period).
 
 - **Priority:** HIGH (1) — оновлюється ПІСЛЯ Equipment (0), ДО Thermostat (2)
-- **Inputs:** читає equipment.air_temp, equipment.sensor1_ok, equipment.sensor2_ok,
-  equipment.door_open, equipment.compressor, equipment.evap_temp, defrost.active,
-  defrost.phase з SharedState
+- **Multi-zone:** per-zone instances через InputBindings (як Thermostat/Defrost)
+  - `protection` (primary) — compressor tracker, всі алярми
+  - `protection_z2` (secondary) — тільки temperature alarms (HAL, LAL, HACCP, sensor, rate)
+- **Inputs:** read_input_float/bool з автоматичним ремапінгом через InputBindings
 - **Features:** 4 features (basic_protection, door_protection, compressor_protection, rate_protection)
 
 ### 10 незалежних моніторів аварій

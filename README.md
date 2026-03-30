@@ -40,7 +40,7 @@ Verified on ESP32 + KC868-A6 board with real refrigeration equipment:
 | Parameter | Value |
 |-----------|-------|
 | Firmware | v1.0.1 |
-| Free RAM | 114 KB (94 KB minimum) |
+| Free RAM | ~85 KB after init |
 | Board | KC868-A6 (PCF8574 I2C: 6 relays, 6 inputs) |
 | WiFi | STA mode, -51 dBm signal |
 | MQTT | Connected (TLS) to modesp.com.ua |
@@ -53,13 +53,13 @@ Verified on ESP32 + KC868-A6 board with real refrigeration equipment:
 
 | Metric | Value |
 |--------|-------|
-| State keys | 126 (63 metadata, 50 MQTT pub, 62 MQTT sub) |
+| State keys | 231 (178 metadata, 107 MQTT pub, 166 MQTT sub) |
 | Modules | 7 (equipment, thermostat, defrost, protection, eev, lighting, datalogger) |
 | Drivers | 11 (DS18B20, NTC, relay, digital input, PCF8574 relay/input, pressure ADC, EEV analog/stepper/PCF8574, AKV pulse) |
 | HTTP endpoints | 23 REST + WebSocket + OTA |
 | Tests | 491 (310 pytest + 181 C++ host / 418 assertions) |
-| WebUI | 80 KB gzipped, Svelte 4, dark/light theme, 4 languages |
-| Firmware binary | ~1.2 MB, 94–114 KB free heap |
+| WebUI | 83 KB gzipped (Svelte 4, dark/light theme, 4 languages) |
+| Firmware binary | ~1.3 MB firmware + 960 KB data partition |
 | Target | ESP32-WROOM-32, 4 MB flash, ESP-IDF v5.5 |
 
 > **Full feature list:** [docs/FEATURES.md](docs/FEATURES.md) | [Українською](docs/FEATURES_UA.md)
@@ -124,7 +124,7 @@ Business modules publish requests to SharedState. Equipment Manager arbitrates a
 
 ## Web Interface
 
-Svelte 4 SPA — 80 KB gzipped, served from ESP32 LittleFS.
+Svelte 4 SPA — 83 KB gzipped, served from ESP32 LittleFS.
 
 <p align="center">
   <img src="docs/img/dashboard.jpg" width="240" alt="Dashboard" />
@@ -170,7 +170,7 @@ boards/
 | Board | I/O | Interface |
 |-------|-----|-----------|
 | ESP32-DevKit | GPIO relay + OW + DI + ADC | Direct GPIO |
-| KC868-A6 | 6 relay + 6 input | PCF8574 I2C |
+| KC868-A6 | 6 relay + 6 input + DAC (2 × 0-10V) + ADC (4ch) + OneWire (2 buses) + Stepper (2 ports) | PCF8574 I2C |
 | Custom | Any combination | JSON config |
 
 ---
@@ -204,7 +204,7 @@ cd tests/host && cmake -B build && cmake --build build && ctest --test-dir build
                    │  └────┬─────┘  └─────┬─────┘  └────┬─────┘  │
   ┌──────────┐     │       │              │              │        │
   │  Relay   │◄───►│  ┌────▼──────────────▼──────────────▼────┐   │
-  │  PCF8574 │     │  │         State Engine (126 keys)       │   │
+  │  PCF8574 │     │  │         State Engine (231 keys)       │   │
   │  GPIO    │     │  └────┬──────────┬──────────┬────────────┘   │
   └──────────┘     │       │          │          │                │
                    │  ┌────▼────┐ ┌───▼────┐ ┌──▼─────────┐      │
@@ -237,7 +237,7 @@ cd tests/host && cmake -B build && cmake --build build && ctest --test-dir build
 | Language | C++17, ETL (zero heap allocation) |
 | JSON parser | jsmn (header-only, zero-alloc) |
 | Filesystem | LittleFS (datalog), NVS (parameters) |
-| WebUI | Svelte 4, Rollup, 80 KB gzipped |
+| WebUI | Svelte 4, Rollup, 83 KB gzipped |
 | Code generation | Python 3 (manifest → 5 artifacts) |
 | Testing | doctest (host C++), pytest (integration) |
 | Cloud | ModESP Cloud / AWS IoT Core (compile-time) |
@@ -259,6 +259,8 @@ modules/
 ├── thermostat/         # 4-state FSM, fan control, night setback
 ├── defrost/            # 7-phase FSM, 3 types, 4 initiations
 ├── protection/         # 10 monitors, CompressorTracker, 2-level escalation
+├── eev/                # Electronic expansion valve (analog, stepper, PCF8574)
+├── lighting/           # Case lighting control, schedules
 └── datalogger/         # 6-ch temperature + 18 event types (LittleFS)
 drivers/                # 11 drivers: ds18b20, ntc, relay, digital_input, pcf8574_*, pressure_adc, eev_analog/stepper/pcf8574, akv_pulse
 webui/                  # Svelte 4 source
@@ -323,7 +325,7 @@ This project demonstrates production-grade embedded engineering across the full 
 **Firmware Architecture**
 - Manifest-driven code generation — JSON manifests produce 5 C++ headers + UI schema at build time
 - Zero heap allocation in runtime loops — ETL containers instead of STL
-- SharedState engine with 126 typed keys, compile-time metadata, automatic NVS persistence
+- SharedState engine with 231 typed keys, compile-time metadata, automatic NVS persistence
 - Equipment arbitration with safety interlocks — Protection always overrides business logic
 
 **Refrigeration Domain Expertise**
@@ -333,14 +335,14 @@ This project demonstrates production-grade embedded engineering across the full 
 - CompressorTracker: motor hours, cycle counting, continuous-run detection
 
 **Embedded Web & Connectivity**
-- Svelte 4 SPA served from ESP32 flash — 80 KB gzipped with WebSocket real-time updates
+- Svelte 4 SPA served from ESP32 flash — 83 KB gzipped with WebSocket real-time updates
 - 4-language i18n with lazy-loaded language packs (~8 KB each)
 - MQTT over TLS with delta-publish, heartbeat, LWT, and Home Assistant Auto-Discovery
 - WiFi STA + AP with intelligent probe (exponential backoff, heap guard)
 
 **Hardware Abstraction**
 - board.json + bindings.json — same firmware binary on different PCBs
-- 6 driver types covering temperature sensors, relays, and I2C expanders
+- 11 driver types covering temperature sensors, relays, I2C expanders, pressure ADC, and EEV control
 - Dual OTA partitions with SHA-256 verification and automatic rollback
 
 **Quality**
