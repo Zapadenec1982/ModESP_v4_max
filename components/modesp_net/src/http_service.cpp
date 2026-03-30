@@ -279,23 +279,27 @@ esp_err_t HttpService::handle_get_state(httpd_req_t* req) {
 }
 
 esp_err_t HttpService::handle_get_board(httpd_req_t* req) {
-    // Heap allocation — board.json може бути до 4KB з extended hardware config
-    char* buf = static_cast<char*>(malloc(4096));
-    if (!buf) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OOM");
-        return ESP_FAIL;
-    }
-    int len = read_file_to_buf("/data/board.json", buf, 4096);
-    if (len < 0) {
-        free(buf);
+    FILE* f = fopen("/data/board.json", "r");
+    if (!f) {
         httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "board.json not found");
         return ESP_FAIL;
     }
 
     set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, buf, len);
-    free(buf);
+
+    // Chunked streaming — board.json може бути >1KB, без malloc
+    char buf[512];
+    size_t read_bytes;
+    while ((read_bytes = fread(buf, 1, sizeof(buf), f)) > 0) {
+        if (httpd_resp_send_chunk(req, buf, read_bytes) != ESP_OK) {
+            fclose(f);
+            httpd_resp_send_chunk(req, nullptr, 0);
+            return ESP_FAIL;
+        }
+    }
+    fclose(f);
+    httpd_resp_send_chunk(req, nullptr, 0);
     return ESP_OK;
 }
 
