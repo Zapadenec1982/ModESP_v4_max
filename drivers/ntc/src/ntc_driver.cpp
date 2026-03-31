@@ -11,14 +11,10 @@
 
 #include "ntc_driver.h"
 #include "esp_log.h"
+#include "modesp/hal/adc_shared.h"
 #include <cmath>
 
 static const char TAG[] = "NTC";
-
-// Спільний ADC1 handle для всіх NTC instances.
-// adc_oneshot_new_unit(ADC_UNIT_1) можна викликати тільки ОДИН раз —
-// другий виклик повертає ESP_ERR_INVALID_STATE і драйвер не ініціалізується.
-static adc_oneshot_unit_handle_t s_adc1_handle = nullptr;
 
 void NtcDriver::configure(const char* role, gpio_num_t gpio, uint8_t atten) {
     role_ = role;
@@ -53,21 +49,12 @@ bool NtcDriver::init() {
         return false;
     }
 
-    // Ініціалізуємо ADC1 oneshot — один shared handle для всіх NTC instances.
-    // Якщо вже ініціалізований (другий датчик) — просто використовуємо існуючий.
-    esp_err_t err = ESP_OK;
-    if (!s_adc1_handle) {
-        adc_oneshot_unit_init_cfg_t unit_cfg = {};
-        unit_cfg.unit_id = ADC_UNIT_1;
-        unit_cfg.ulp_mode = ADC_ULP_MODE_DISABLE;
-
-        err = adc_oneshot_new_unit(&unit_cfg, &s_adc1_handle);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "[%s] ADC unit init failed: %s", role_.c_str(), esp_err_to_name(err));
-            return false;
-        }
+    // Shared ADC1 handle (єдиний для NTC + PressureAdc + future ADC drivers)
+    adc_handle_ = modesp::get_shared_adc1_handle();
+    if (!adc_handle_) {
+        ESP_LOGE(TAG, "[%s] Failed to get shared ADC1 handle", role_.c_str());
+        return false;
     }
-    adc_handle_ = s_adc1_handle;
 
     // Конфігуруємо канал
     adc_oneshot_chan_cfg_t chan_cfg = {};

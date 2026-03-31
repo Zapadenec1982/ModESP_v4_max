@@ -11,6 +11,7 @@
 
 #ifndef HOST_BUILD
   #include "esp_log.h"
+  #include "modesp/hal/adc_shared.h"
 #else
   #include "esp_log.h"  // mock
 #endif
@@ -20,11 +21,6 @@
 static const char TAG[] = "PressureADC";
 
 namespace modesp {
-
-// Shared ADC1 handle (same pattern as NtcDriver)
-#ifndef HOST_BUILD
-static adc_oneshot_unit_handle_t s_adc1_handle = nullptr;
-#endif
 
 void PressureAdcDriver::configure(const char* role, int gpio, uint8_t atten) {
     role_ = role;
@@ -40,19 +36,12 @@ bool PressureAdcDriver::init() {
     }
 
 #ifndef HOST_BUILD
-    // Initialize shared ADC1 unit (once for all ADC drivers)
-    esp_err_t err = ESP_OK;
-    if (!s_adc1_handle) {
-        adc_oneshot_unit_init_cfg_t unit_cfg = {};
-        unit_cfg.unit_id = ADC_UNIT_1;
-        unit_cfg.ulp_mode = ADC_ULP_MODE_DISABLE;
-        err = adc_oneshot_new_unit(&unit_cfg, &s_adc1_handle);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "[%s] ADC unit init failed: %s", role_.c_str(), esp_err_to_name(err));
-            return false;
-        }
+    // Shared ADC1 handle (єдиний для NTC + PressureAdc + future ADC drivers)
+    adc_handle_ = get_shared_adc1_handle();
+    if (!adc_handle_) {
+        ESP_LOGE(TAG, "[%s] Failed to get shared ADC1 handle", role_.c_str());
+        return false;
     }
-    adc_handle_ = s_adc1_handle;
 
     // Map GPIO to ADC1 channel
     if (!gpio_to_adc1_channel(gpio_, adc_channel_)) {
