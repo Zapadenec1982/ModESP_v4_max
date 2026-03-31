@@ -1149,41 +1149,122 @@ void MqttService::publish_ha_discovery() {
     };
 
     static const EntityDef ENTITIES[] = {
-        // Температури
+        // Температури (Equipment — глобальні)
         {"equipment.air_temp",          "Air Temperature",    "sensor",        "temperature", "\xc2\xb0" "C", "measurement"},
         {"equipment.evap_temp",         "Evap Temperature",   "sensor",        "temperature", "\xc2\xb0" "C", "measurement"},
         {"equipment.cond_temp",         "Cond Temperature",   "sensor",        "temperature", "\xc2\xb0" "C", "measurement"},
-        {"thermostat.setpoint",         "Setpoint",           "sensor",        "temperature", "\xc2\xb0" "C", "measurement"},
-        {"thermostat.effective_setpoint","Effective Setpoint", "sensor",        "temperature", "\xc2\xb0" "C", "measurement"},
-        // Бінарні стани обладнання
+        // Бінарні стани обладнання (глобальні)
         {"equipment.compressor",        "Compressor",         "binary_sensor", "",            "",            ""},
         {"equipment.defrost_relay",     "Defrost Relay",      "binary_sensor", "",            "",            ""},
         {"equipment.evap_fan",          "Evap Fan",           "binary_sensor", "",            "",            ""},
         {"equipment.cond_fan",          "Cond Fan",           "binary_sensor", "",            "",            ""},
-        // Аварії
-        {"thermostat.alarm_active",     "Alarm Active",       "binary_sensor", "problem",     "",            ""},
-        {"protection.high_alarm",       "High Temp Alarm",    "binary_sensor", "problem",     "",            ""},
-        {"protection.low_alarm",        "Low Temp Alarm",     "binary_sensor", "problem",     "",            ""},
+        // Аварії (Protection — глобальні)
+        {"protection.alarm_active",     "Alarm Active",       "binary_sensor", "problem",     "",            ""},
+        {"protection.alarm_code",       "Alarm Code",         "sensor",        "",            "",            ""},
+        {"protection.high_temp_alarm",  "High Temp Alarm",    "binary_sensor", "problem",     "",            ""},
+        {"protection.low_temp_alarm",   "Low Temp Alarm",     "binary_sensor", "problem",     "",            ""},
         {"protection.rate_alarm",       "Rate-of-Change Alarm","binary_sensor","problem",     "",            ""},
         {"protection.short_cycle_alarm","Short Cycle Alarm",  "binary_sensor", "problem",     "",            ""},
         {"protection.rapid_cycle_alarm","Rapid Cycle Alarm",  "binary_sensor", "problem",     "",            ""},
-        // Текстові стани
-        {"thermostat.alarm_code",       "Alarm Code",         "sensor",        "",            "",            ""},
-        {"defrost.active",              "Defrost Active",     "binary_sensor", "",            "",            ""},
-        {"defrost.state",               "Defrost State",      "sensor",        "",            "",            ""},
-        // Діагностика
+        // Діагностика (глобальні)
         {"protection.compressor_hours", "Motor Hours",        "sensor",        "duration",    "h",           "total_increasing"},
         {"protection.compressor_duty",  "Duty Cycle",         "sensor",        "",            "%",           "measurement"},
         {"system.uptime",               "Uptime",             "sensor",        "duration",    "s",           "total_increasing"},
-        {"system.heap_free",            "Free Heap",          "sensor",        "",            "B",           "measurement"},
+        {"system.heap_largest",         "Free Heap",          "sensor",        "",            "B",           "measurement"},
     };
 
-    ESP_LOGI(TAG, "Publishing HA discovery (%d entities, device=%s)", (int)(sizeof(ENTITIES)/sizeof(ENTITIES[0])), device_id);
+    // Per-zone entities: thermostat, defrost, eev
+    struct ZoneEntityDef {
+        const char* suffix;        // key suffix after zone namespace
+        const char* name_suffix;   // HA entity name suffix
+        const char* entity_type;
+        const char* device_class;
+        const char* unit;
+        const char* state_class;
+    };
 
+    static const ZoneEntityDef ZONE_ENTITIES[] = {
+        {"setpoint",           "Setpoint",          "sensor", "temperature", "\xc2\xb0" "C", "measurement"},
+        {"effective_setpoint", "Effective Setpoint", "sensor", "temperature", "\xc2\xb0" "C", "measurement"},
+        {"temperature",        "Temperature",       "sensor", "temperature", "\xc2\xb0" "C", "measurement"},
+        {"state",              "State",             "sensor", "",            "",              ""},
+    };
+
+    static const ZoneEntityDef ZONE_DEFROST_ENTITIES[] = {
+        {"active",  "Defrost Active", "binary_sensor", "", "", ""},
+        {"state",   "Defrost State",  "sensor",        "", "", ""},
+    };
+
+    static const ZoneEntityDef ZONE_EEV_ENTITIES[] = {
+        {"superheat",  "Superheat",      "sensor", "temperature", "K",  "measurement"},
+        {"valve_pos",  "Valve Position", "sensor", "",            "%",  "measurement"},
+        {"state",      "EEV State",     "sensor", "",            "",   ""},
+    };
+
+    // Визначаємо zone_count з SharedState
+    int32_t zone_count = 1;
+    if (state_) {
+        auto val = state_->get("equipment.active_zones");
+        if (val.has_value()) {
+            const auto* iv = etl::get_if<int32_t>(&val.value());
+            if (iv) zone_count = *iv;
+        }
+    }
+
+    ESP_LOGI(TAG, "Publishing HA discovery (%d global + %ld zones, device=%s)",
+             (int)(sizeof(ENTITIES)/sizeof(ENTITIES[0])),
+             static_cast<long>(zone_count), device_id);
+
+    // Глобальні entities
     for (const auto& e : ENTITIES) {
         publish_ha_entity(e.state_key, e.name, e.entity_type,
                           e.device_class, e.unit, e.state_class,
                           device_id, device_name);
+    }
+
+    // Per-zone entities
+    static const char* thermo_ns[] = {"thermo_z1", "thermo_z2", "thermo_z3", "thermo_z4"};
+    static const char* defrost_ns[] = {"defrost_z1", "defrost_z2", "defrost_z3", "defrost_z4"};
+    static const char* eev_ns[] = {"eev_z1", "eev_z2", "eev_z3", "eev_z4"};
+
+    for (int z = 0; z < zone_count && z < 4; z++) {
+        char key[48];
+        char name[64];
+        const char* zone_label = (zone_count > 1) ? "" : "";
+
+        for (const auto& ze : ZONE_ENTITIES) {
+            snprintf(key, sizeof(key), "%s.%s", thermo_ns[z], ze.suffix);
+            if (zone_count > 1) {
+                snprintf(name, sizeof(name), "Z%d %s", z + 1, ze.name_suffix);
+            } else {
+                snprintf(name, sizeof(name), "%s", ze.name_suffix);
+            }
+            publish_ha_entity(key, name, ze.entity_type,
+                              ze.device_class, ze.unit, ze.state_class,
+                              device_id, device_name);
+        }
+        for (const auto& ze : ZONE_DEFROST_ENTITIES) {
+            snprintf(key, sizeof(key), "%s.%s", defrost_ns[z], ze.suffix);
+            if (zone_count > 1) {
+                snprintf(name, sizeof(name), "Z%d %s", z + 1, ze.name_suffix);
+            } else {
+                snprintf(name, sizeof(name), "%s", ze.name_suffix);
+            }
+            publish_ha_entity(key, name, ze.entity_type,
+                              ze.device_class, ze.unit, ze.state_class,
+                              device_id, device_name);
+        }
+        for (const auto& ze : ZONE_EEV_ENTITIES) {
+            snprintf(key, sizeof(key), "%s.%s", eev_ns[z], ze.suffix);
+            if (zone_count > 1) {
+                snprintf(name, sizeof(name), "Z%d %s", z + 1, ze.name_suffix);
+            } else {
+                snprintf(name, sizeof(name), "%s", ze.name_suffix);
+            }
+            publish_ha_entity(key, name, ze.entity_type,
+                              ze.device_class, ze.unit, ze.state_class,
+                              device_id, device_name);
+        }
     }
 
     ESP_LOGI(TAG, "HA discovery complete");
