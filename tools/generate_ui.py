@@ -1688,24 +1688,29 @@ class MqttTopicsGenerator:
 class DisplayScreensGenerator:
     """Generates generated/display_screens.h for LCD/OLED menus."""
 
-    def generate(self, manifests):
+    def generate(self, manifests, project=None):
         main_values = []
         menu_items = []
 
         for m in manifests:
+            mod = m.get("module", "?")
             display = m.get("display", {})
             mv = display.get("main_value")
             if mv:
-                main_values.append({
-                    "module": m["module"],
-                    "key": mv["key"],
-                    "format": mv.get("format", "%s"),
-                })
+                expanded = expand_zone_entries(project or {}, mod, [(mv["key"], {})])
+                for ns, orig_mod, new_key, _ in expanded:
+                    main_values.append({
+                        "module": ns,
+                        "key": new_key,
+                        "format": mv.get("format", "%s"),
+                    })
             for item in display.get("menu_items", []):
-                menu_items.append({
-                    "label": item["label"],
-                    "key": item["key"],
-                })
+                expanded = expand_zone_entries(project or {}, mod, [(item["key"], {})])
+                for ns, orig_mod, new_key, _ in expanded:
+                    menu_items.append({
+                        "label": item["label"],
+                        "key": new_key,
+                    })
 
         lines = [
             "#pragma once",
@@ -1864,26 +1869,28 @@ class ModbusRegmapGenerator:
       Keys are assigned within their block in manifest order.
     """
 
-    # Fixed base addresses per module (stable — never changes)
+    # Fixed base addresses per module (stable — never changes).
+    # Zone modules get 100-slot blocks (50 per zone × 2 zones max).
+    # Non-zone modules get 50-slot blocks.
     MODULE_INPUT_BASE = {
         "equipment":  30001,   # 30001-30049 (sensors, relay states)
-        "thermostat": 30051,   # 30051-30099 (temperatures, states)
-        "defrost":    30101,   # 30101-30149 (phases, timers)
-        "protection": 30151,   # 30151-30249 (alarms, diagnostics)
-        "lighting":   30251,   # 30251-30279
-        "datalogger": 30281,   # 30281-30299
-        "eev":        30301,   # 30301-30349 (superheat, valve, PI)
+        "thermostat": 30051,   # 30051-30149 (per-zone: Z1=30051-30099, Z2=30101-30149)
+        "defrost":    30151,   # 30151-30249 (per-zone: Z1=30151-30199, Z2=30201-30249)
+        "protection": 30251,   # 30251-30349 (alarms, diagnostics)
+        "lighting":   30351,   # 30351-30399
+        "datalogger": 30401,   # 30401-30449
+        "eev":        30451,   # 30451-30549 (per-zone: Z1=30451-30499, Z2=30501-30549)
     }
     MODULE_HOLDING_BASE = {
         "equipment":  40001,   # 40001-40049 (NTC config, offsets)
-        "thermostat": 40051,   # 40051-40099 (setpoints, timers)
-        "defrost":    40101,   # 40101-40149 (intervals, temps)
-        "protection": 40151,   # 40151-40249 (limits, delays)
-        "lighting":   40251,   # 40251-40279
-        "eev":        40301,   # 40301-40349 (SH target, PID params)
+        "thermostat": 40051,   # 40051-40149 (per-zone)
+        "defrost":    40151,   # 40151-40249 (per-zone)
+        "protection": 40251,   # 40251-40349 (limits, delays)
+        "lighting":   40351,   # 40351-40399
+        "eev":        40401,   # 40401-40499 (per-zone)
     }
 
-    def generate(self, manifests):
+    def generate(self, manifests, project=None):
         input_entries = []
         holding_entries = []
         errors = []
@@ -1895,7 +1902,10 @@ class ModbusRegmapGenerator:
             input_idx = 0
             holding_idx = 0
 
-            for key, info in m.get("state", {}).items():
+            raw_entries = list(m.get("state", {}).items())
+            expanded = expand_zone_entries(project or {}, mod, raw_entries)
+
+            for ns, orig_mod, key, info in expanded:
                 stype = info.get("type", "float")
                 access = info.get("access", "read")
 
@@ -2201,7 +2211,7 @@ def main():
 
     # 4. display_screens.h
     display_gen = DisplayScreensGenerator()
-    display_h = display_gen.generate(manifests)
+    display_h = display_gen.generate(manifests, project)
     display_path = gen_dir / "display_screens.h"
     with open(display_path, "w", encoding="utf-8") as f:
         f.write(display_h)
@@ -2210,7 +2220,7 @@ def main():
 
     # 5. modbus_regmap.h
     modbus_gen = ModbusRegmapGenerator()
-    modbus_h = modbus_gen.generate(manifests)
+    modbus_h = modbus_gen.generate(manifests, project)
     modbus_path = gen_dir / "modbus_regmap.h"
     with open(modbus_path, "w", encoding="utf-8") as f:
         f.write(modbus_h)

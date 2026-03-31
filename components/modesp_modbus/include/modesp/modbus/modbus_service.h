@@ -66,12 +66,11 @@ private:
     // Shadow arrays — accessed by esp-modbus task AND on_update()
     // Protected by mbc_slave_lock()/unlock()
     // Sizes match max register offset in generated/modbus_regmap.h:
-    //   Input:   30283 - 30001 = 282 → need [283]
-    //   Holding: 40251 - 40001 = 250 → need [251]
-    // BUG FIX: was [128] — registers with offset >127 were silently lost
-    uint16_t shadow_input_[284] = {};     // Input registers (read-only)
-    uint16_t shadow_holding_[252] = {};   // Holding registers (read-write)
-    uint16_t prev_holding_[252] = {};     // Previous holding values (for write detection)
+    //   With zone expansion: max input = 30549 (eev Z2) → offset 548 → need [549]
+    //   With zone expansion: max holding = 40499 (eev Z2) → offset 498 → need [499]
+    uint16_t shadow_input_[550] = {};     // Input registers (read-only, zone-expanded)
+    uint16_t shadow_holding_[500] = {};   // Holding registers (read-write, zone-expanded)
+    uint16_t prev_holding_[500] = {};     // Previous holding values (for write detection)
     uint8_t shadow_coils_[16] = {};       // Coils (read-only, alarm bits)
     uint8_t shadow_discrete_[8] = {};     // Discrete inputs (relay states)
 
