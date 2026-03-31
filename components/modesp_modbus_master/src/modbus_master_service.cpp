@@ -77,6 +77,9 @@ void ModbusMasterService::poll() {
 }
 
 void ModbusMasterService::poll_slave(ExpansionSlave& slave) {
+    // TODO: mbc_master_send_request() БЛОКУЄ до response_tout_ms (500мс).
+    // При 8 slaves = 4с блокування. Потрібно окремий FreeRTOS task.
+
     // Читання input registers (sensor data)
     if (slave.input_reg_count > 0) {
         uint16_t buf[32] = {};
@@ -113,7 +116,8 @@ void ModbusMasterService::publish_inputs(const ExpansionSlave& slave,
     for (size_t i = 0; i < count; i++) {
         snprintf(key, sizeof(key), "expansion.s%d.input_%d",
                  slave.address, static_cast<int>(i));
-        // Scale: int16 × 0.1 → float (standard Modbus convention)
+        // TODO: завжди scale ×0.1 — хибно для boolean (DI) та raw integer registers.
+        // Потрібен per-register type з ExpansionSlave config.
         float val = static_cast<int16_t>(data[i]) / 10.0f;
         state_->set(key, val);
     }
@@ -144,6 +148,7 @@ bool ModbusMasterService::write_coil(uint8_t slave_addr, uint16_t coil_addr, boo
 bool ModbusMasterService::add_slave(uint8_t address, uint8_t type,
                                      uint16_t input_start, uint16_t input_count,
                                      uint16_t coil_start, uint16_t coil_count) {
+    // TODO: перевірка duplicate address (add_slave не валідує унікальність)
     for (size_t i = 0; i < MAX_EXPANSION_SLAVES; i++) {
         if (slaves_[i].type == 0) {
             slaves_[i] = {address, type, input_start, input_count,

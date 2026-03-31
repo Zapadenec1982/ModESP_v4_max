@@ -2,6 +2,8 @@
  * @file modbus_master_service.h
  * @brief Modbus RTU Master — опитування виносних I/O модулів розширення
  *
+ * STATUS: INCOMPLETE (skeleton) — не підключений до main.cpp, NVS/HTTP = stubs.
+ *
  * Працює на UART2, незалежно від Modbus Slave (UART1).
  * Опитує expansion slaves, маппить registers → SharedState.
  *
@@ -13,6 +15,15 @@
  *
  * Конфігурація через HTTP API: GET/POST /api/expansion
  * Mapping зберігається в NVS namespace "mbm"
+ *
+ * Known issues (TODO before production):
+ *   1. poll() is BLOCKING — mbc_master_send_request() blocks up to 500ms/slave.
+ *      Must run in separate FreeRTOS task, not main loop.
+ *   2. load_config() / save_config() — NVS not implemented (stubs).
+ *   3. register_http_handlers() — /api/expansion not implemented (stub).
+ *   4. publish_inputs() always scales ×0.1 — wrong for bool/integer registers.
+ *   5. add_slave() doesn't check for duplicate addresses.
+ *   6. Not registered in main.cpp — not part of the running system.
  */
 
 #pragma once
