@@ -627,7 +627,7 @@ void ProtectionModule::update_compressor_tracker(bool compressor_on, float temp,
                         float evap_temp = read_input_float("equipment.evap_temp");
                         float demand_temp = read_input_float("defrost.demand_temp", -15.0f);
                         if (evap_temp < demand_temp) {
-                            state_set("defrost.manual_start", true);
+                            state_set(resolve_input("defrost.manual_start"), true);
                             ESP_LOGI(TAG, "Icing suspected (evap=%.1f < demand=%.1f) — defrost triggered",
                                      evap_temp, demand_temp);
                         }

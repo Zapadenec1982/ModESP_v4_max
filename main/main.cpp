@@ -118,6 +118,9 @@ static constexpr modesp::InputBinding z1_prot_inputs[] = {
     {"equipment.compressor",     "equipment.compressor"},
     {"defrost.active",           "defrost_z1.active"},
     {"defrost.phase",            "defrost_z1.phase"},
+    {"defrost.type",             "defrost_z1.type"},
+    {"defrost.demand_temp",      "defrost_z1.demand_temp"},
+    {"defrost.manual_start",     "defrost_z1.manual_start"},
     {"thermostat.cc_remaining",  "thermo_z1.cc_remaining"},
     {"thermostat.cc_alarm_bypass","thermo_z1.cc_alarm_bypass"},
 };
