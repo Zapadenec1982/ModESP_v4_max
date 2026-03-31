@@ -75,8 +75,8 @@ private:
     static constexpr float INPUT_SCALE = 5.0f / 3.3f;  // KC868-A6 LM224 inverse
 
     // ─── Diagnostics thresholds ────────────────────────────
-    static constexpr int ADC_OPEN_THRESHOLD = 30;    // < this = open circuit
-    static constexpr int ADC_SHORT_THRESHOLD = 4080; // > this = short circuit
+    static constexpr int ADC_OPEN_THRESHOLD = 100;    // < this = open circuit (~0.3V sensor, industry standard)
+    static constexpr int ADC_SHORT_THRESHOLD = 3850; // > this = short circuit (~4.7V sensor, industry standard)
     static constexpr uint8_t MAX_CONSECUTIVE_ERRORS = 5;
 
     // ─── State ─────────────────────────────────────────────

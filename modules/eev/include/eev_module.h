@@ -71,7 +71,7 @@ private:
     uint32_t startup_wait_ms_ = 120000;  // ms before PI enables
     float min_pos_ = 5.0f;         // Minimum position %
     float max_pos_ = 95.0f;        // Maximum position %
-    float safe_pos_ = 40.0f;       // Position on sensor fault %
+    float safe_pos_ = 20.0f;       // Position on sensor fault %
     float low_sh_limit_ = 2.0f;    // Low SH protection threshold (K)
     float mop_pressure_ = 0.0f;    // MOP bar (0=disabled)
     float lop_pressure_ = 0.0f;    // LOP bar (0=disabled)

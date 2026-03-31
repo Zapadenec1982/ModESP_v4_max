@@ -173,11 +173,11 @@
     "eev.safe_pos": {
       "type": "float",
       "access": "readwrite",
-      "min": 20.0, "max": 60.0, "step": 1.0,
-      "default": 40.0,
+      "min": 10.0, "max": 60.0, "step": 1.0,
+      "default": 20.0,
       "persist": true,
       "unit": "%",
-      "description": "Безпечна позиція при відмові датчика"
+      "description": "Безпечна позиція при відмові датчика (10-20% рекомендовано)"
     },
     "eev.low_sh_limit": {
       "type": "float",
