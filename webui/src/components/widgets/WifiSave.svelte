@@ -3,12 +3,27 @@
   import { t } from '../../stores/i18n.js';
   import { toastSuccess, toastError, toastWarn } from '../../stores/toast.js';
   import { wifiSsid, wifiPassword } from '../../stores/wifiForm.js';
+  import { state } from '../../stores/state.js';
 
   export let config;
 
   let loading = false;
+  let connecting = false;
+  let redirectUrl = '';
+  let countdown = 30;
+  let countdownInterval = null;
 
-  let showRestartDialog = false;
+  // Реактивне спостереження за wifi.ip — коли STA підключиться, redirect
+  $: if (connecting && $state['wifi.ip'] && $state['wifi.ip'] !== '192.168.4.1' && $state['wifi.ip'] !== '') {
+    // STA підключився — redirect на нову адресу
+    const newIp = $state['wifi.ip'];
+    toastSuccess(`Connected! IP: ${newIp}`);
+    clearInterval(countdownInterval);
+    // Redirect через 2с щоб toast встиг показатись
+    setTimeout(() => {
+      window.location.href = redirectUrl || `http://${newIp}`;
+    }, 2000);
+  }
 
   async function save() {
     const ssid = ($wifiSsid || '').trim();
@@ -20,8 +35,9 @@
     try {
       const r = await apiPost('/api/wifi', { ssid, password });
       if (r.ok) {
+        redirectUrl = r.redirect || '';
         toastSuccess($t['alert.wifi_saved'] || 'WiFi saved');
-        showRestartDialog = true;
+        startConnecting();
       } else {
         toastError($t['alert.error']);
       }
@@ -32,37 +48,38 @@
     }
   }
 
-  async function restart() {
-    showRestartDialog = false;
-    toastSuccess($t['alert.restarting'] || 'Restarting...');
-    try {
-      await apiPost('/api/restart');
-    } catch (e) {
-      // Expected — connection lost during restart
-    }
-  }
-
-  function dismissDialog() {
-    showRestartDialog = false;
+  function startConnecting() {
+    connecting = true;
+    countdown = 30;
+    countdownInterval = setInterval(() => {
+      countdown--;
+      if (countdown <= 0) {
+        clearInterval(countdownInterval);
+        connecting = false;
+        toastError($t['wifi.connect_timeout'] || 'Connection timeout. Try again or check credentials.');
+      }
+    }, 1000);
   }
 </script>
 
 <div class="save-widget">
-  <button class="action-btn" disabled={loading} on:click={save}>
+  <button class="action-btn" disabled={loading || connecting} on:click={save}>
     {loading ? '...' : (config.label || $t['btn.save'])}
   </button>
 </div>
 
-{#if showRestartDialog}
-  <div class="dialog-overlay" on:click={dismissDialog}>
-    <div class="dialog" on:click|stopPropagation>
+{#if connecting}
+  <div class="dialog-overlay">
+    <div class="dialog">
       <div class="dialog-icon">📶</div>
-      <div class="dialog-title">{$t['wifi.restart_title'] || 'WiFi збережено'}</div>
-      <div class="dialog-text">{$t['wifi.restart_text'] || 'Перезавантажити пристрій для підключення до нової мережі?'}</div>
-      <div class="dialog-buttons">
-        <button class="btn-cancel" on:click={dismissDialog}>{$t['btn.cancel'] || 'Пізніше'}</button>
-        <button class="btn-restart" on:click={restart}>{$t['btn.restart'] || 'Перезавантажити'}</button>
+      <div class="dialog-title">{$t['wifi.connecting_title'] || 'Підключення...'}</div>
+      <div class="dialog-text">
+        {$t['wifi.connecting_text'] || 'Підключаємось до нової мережі. AP залишається доступним.'}
       </div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: {((30 - countdown) / 30) * 100}%"></div>
+      </div>
+      <div class="countdown">{countdown}s</div>
     </div>
   </div>
 {/if}
@@ -94,15 +111,15 @@
   .dialog-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; color: var(--text, #1e293b); }
   .dialog-text { font-size: 14px; color: var(--text-secondary, #64748b); margin-bottom: 20px; line-height: 1.5; }
   .dialog-buttons { display: flex; gap: 10px; }
-  .btn-cancel {
-    flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--border, #e2e8f0);
-    background: transparent; color: var(--text-secondary, #64748b); cursor: pointer; font-size: 14px;
+  .progress-bar {
+    width: 100%; height: 6px; background: var(--border, #e2e8f0);
+    border-radius: 3px; overflow: hidden; margin-top: 16px;
   }
-  .btn-restart {
-    flex: 1; padding: 10px; border-radius: 10px; border: none;
-    background: linear-gradient(135deg, #3b82f6, #0369a1); color: #fff;
-    cursor: pointer; font-size: 14px; font-weight: 600;
+  .progress-fill {
+    height: 100%; background: linear-gradient(90deg, #3b82f6, #06b6d4);
+    border-radius: 3px; transition: width 1s linear;
   }
-  .btn-cancel:hover { background: var(--hover-bg, #f1f5f9); }
-  .btn-restart:hover { opacity: 0.9; }
+  .countdown {
+    margin-top: 8px; font-size: 13px; color: var(--text-secondary, #64748b);
+  }
 </style>
