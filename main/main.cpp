@@ -191,6 +191,8 @@ static constexpr modesp::InputBinding z2_thermo_inputs[] = {
 static constexpr modesp::InputBinding z2_defrost_inputs[] = {
     {"equipment.zone_enabled", "equipment.zone2_enabled"},
     {"equipment.compressor",   "equipment.compressor"},
+    {"equipment.air_temp",     "equipment.air_temp_z2"},
+    {"equipment.sensor1_ok",   "equipment.sensor1_z2_ok"},
     {"equipment.evap_temp",    "equipment.evap_temp_z2"},
     {"equipment.has_defrost_relay", "equipment.has_defrost_relay_z2"},
     {"protection.lockout",     "protection.lockout"},

@@ -304,6 +304,13 @@ void DefrostModule::on_update(uint32_t dt_ms) {
         }
     }
 
+    // Очищуємо manual_start якщо defrost вже активний —
+    // запобігає подвійному циклу від одного натиску (flag залишався
+    // в SharedState до наступного IDLE → тригерив ще один defrost).
+    if (phase_ != Phase::IDLE && read_bool(ns_key("manual_start"))) {
+        state_set(ns_key("manual_start"), false);
+    }
+
     // Phase dispatch
     switch (phase_) {
         case Phase::IDLE:
