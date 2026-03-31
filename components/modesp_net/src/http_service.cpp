@@ -22,6 +22,7 @@
 #include "esp_ota_ops.h"
 #include "esp_app_format.h"
 #include "esp_sntp.h"
+#include "esp_timer.h"
 #include "modesp/services/nvs_helper.h"
 #include "mbedtls/base64.h"
 #include "freertos/FreeRTOS.h"
@@ -613,10 +614,26 @@ esp_err_t HttpService::handle_post_wifi(httpd_req_t* req) {
     set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
     if (ok) {
-        httpd_resp_sendstr(req, "{\"ok\":true,\"msg\":\"Credentials saved. Restart to connect.\"}");
-        // Не робимо reconnect автоматично — UI каже користувачу перезавантажити.
-        // Якщо робити reconnect тут — AP зникає і клієнт втрачає з'єднання
-        // ще до отримання HTTP response.
+        // mDNS hostname для redirect — WebUI перенаправить після STA connect
+        char response[192];
+        auto mdns_val = self->state_->get("system.mdns_hostname");
+        const char* hostname = "";
+        if (mdns_val.has_value()) {
+            const auto* sp = etl::get_if<etl::string<32>>(&mdns_val.value());
+            if (sp) hostname = sp->c_str();
+        }
+        snprintf(response, sizeof(response),
+                 "{\"ok\":true,\"redirect\":\"http://%s.local\","
+                 "\"msg\":\"Connecting to new network...\"}",
+                 hostname);
+        httpd_resp_sendstr(req, response);
+
+        // Не рестартуємо — використовуємо AP→STA probe (APSTA mode).
+        // AP залишається доступним поки STA підключається.
+        // WebUI бачить wifi.ip через WebSocket і redirect'ить.
+        // При невдачі — клієнт все ще на AP.
+        self->wifi_->request_reconnect();
+        ESP_LOGI(TAG, "WiFi credentials saved — STA probe initiated");
     } else {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to save");
     }
