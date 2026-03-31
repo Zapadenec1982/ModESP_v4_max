@@ -43,7 +43,6 @@ first_prompt.md
 next_prompt*.md
 CLAUDE_TASK.md
 CLAUDE_TASK_*.md
-CLAUDE.md
 ACTION_PLAN.md
 test_out.txt
 prompts/
