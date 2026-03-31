@@ -86,17 +86,21 @@ ModESP is a complete firmware framework for commercial refrigeration controllers
 
 **Equipment Manager** (Priority = CRITICAL)
 - Only module with direct HAL access
-- Reads sensors via drivers
-- Arbitrates requests from Thermostat/Defrost/Protection
-- Applies outputs to relays
-- Enforces interlocks (e.g., defrost relay ↔ compressor never both ON)
+- Reads sensors via drivers (EMA filter, per-zone)
+- Arbitrates requests from Thermostat/Defrost/Protection (per-zone OR aggregation)
+- Applies outputs to relays (per-zone defrost relay, evap fan, EEV)
+- Enforces interlocks (electric defrost relay ↔ compressor never both ON)
+- Anti-short-cycle: output-level 180s OFF / 120s ON (independent of thermostat)
+- Condenser fan head pressure control: temperature-based hysteresis (Mode 1) or follows compressor (Mode 0)
+- Head pressure recovery: pauses hot gas defrost when cond_temp < low_limit, resumes after 3 min or recovery
+- Multi-zone: natural defrost blocked in 2+ zone systems (fallback to electric)
 
 **Business Modules**
 - Thermostat (Priority = NORMAL): 4-state FSM, night setback, safety run
-- Defrost (Priority = NORMAL): 7-phase FSM, 3 types, 4 initiation modes
-- Protection (Priority = HIGH): 10 independent alarm monitors, CompressorTracker
+- Defrost (Priority = NORMAL): 7-phase FSM, 3 types (natural/electric/hot gas), 6 initiation modes
+- Protection (Priority = HIGH): 10 independent alarm monitors, CompressorTracker, 2-level escalation
 - DataLogger (Priority = LOW): 6-channel recorder, LittleFS, streaming API
-- EEV (Priority = NORMAL): PI algorithm, stepper/analog/PCF8574 control, 23 refrigerants
+- EEV (Priority = NORMAL): velocity-form PI, MOP/LOP/Low SH protection, 4 valve drivers, 23 refrigerants
 - Lighting (Priority = LOW): Schedule-based control
 - Equipment: as above
 
@@ -273,8 +277,22 @@ Switch `boards/dev/` to `boards/kc868a6/`, rebuild, same binary runs on I2C expa
 ```
 Protection.lockout ──┐
 Defrost.req.*    ────┼→ Equipment arbitrator → apply_outputs() → drivers
-Thermostat.req.* ────┘
+Thermostat.req.* ────┘     │
+                           ├── Arbitration: LOCKOUT > COMP_BLOCKED > DEFROST > THERMOSTAT
+                           ├── Interlocks: electric defrost + compressor never both ON
+                           ├── Anti-short-cycle: 180s min OFF, 120s min ON
+                           └── Head pressure control: cond_fan by T_cond + defrost recovery pause
 ```
+
+**Multi-zone arbitration:**
+- Compressor: defrost priority (natural=OFF), OR for thermostat
+- Cond fan: OR(defrost, thermostat) + safety rule (ON when comp ON)
+- Evap fan: per-zone (defrost controls own zone fan)
+- Defrost relay: per-zone (independent per zone)
+- Natural defrost blocked in 2+ zone systems (shared compressor)
+- Head pressure recovery: pauses hot gas defrost when cond_temp drops below limit
+
+**Zone namespace:** Equipment reads `thermo_z1.req.*`, `defrost_z1.*`, `eev_z1.*` (not `thermostat.*`)
 
 **Why:** Safety by architecture. A bug in thermostat cannot cause a short-cycle—the interlocks are structural.
 
@@ -295,10 +313,13 @@ All control-loop code uses ETL (Embedded Template Library) containers with compi
 No direct module-to-module calls. All inter-module communication via a central key-value store:
 
 ```cpp
-state_->set("thermostat.req.compressor", true);  // publish request
-// Equipment reads this, applies arbitration, publishes:
+// Zone 1 thermostat publishes request (namespace thermo_z1):
+state_->set("thermo_z1.req.compressor", true);
+// Equipment reads via zone namespace table, applies arbitration, publishes:
 state_->set("equipment.compressor", true);       // actual state
 ```
+
+**InputBindings:** Cross-module key remapping (e.g., EEV reads `equipment.suction_bar` → resolved to `equipment.suction_bar_z1` via InputBinding). Zero-cost, compile-time.
 
 **Why:** Decoupling. Modules are isolated; can be tested independently.
 

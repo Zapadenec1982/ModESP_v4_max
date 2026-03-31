@@ -47,8 +47,11 @@ Industrial thermostat and defrost logic purpose-built for commercial refrigerati
 ### Defrost
 - **8-phase FSM** — IDLE, PUMP_DOWN, STABILIZE, VALVE_OPEN, ACTIVE, EQUALIZE, DRIP, FAD
 - **3 defrost types** — natural (off-cycle), electric heater, hot-gas
-- **4 initiation modes** — timed interval, adaptive (based on evaporator frost accumulation), manual, external trigger
-- **Module interaction** — defrost suspends thermostat cooling; equipment manager arbitrates relay conflicts
+- **6 initiation modes** — timed interval, demand (evap temp), combined, manual, running time, ΔT (air-evap)
+- **Multi-zone safety** — natural defrost blocked in 2+ zone systems (shared compressor stop = all zones stop); auto-fallback to electric
+- **Skip Defrost** — MPXPRO-style counter algorithm: skips unnecessary defrosts based on cycle duration learning (7 warmup cycles)
+- **Power Defrost** — enhanced end temperature and duration during night mode
+- **Smart skip** — bypasses defrost if evaporator already above end temperature
 
 ---
 
@@ -61,6 +64,10 @@ Hardware abstraction layer that decouples control logic from physical I/O.
 - **Actuator management** — GPIO relay, PCF8574 I2C expander relay, with active-high/low configuration
 - **Digital inputs** — door switch, external defrost trigger, alarm reset — with debouncing
 - **Update order** — Equipment(0) → Protection(1) → Thermostat(2) + Defrost(2) — deterministic execution every cycle
+- **Multi-zone arbitration** — per-zone OR aggregation for shared compressor; per-zone defrost relay, evap fan, EEV
+- **Condenser fan head pressure control** — mode 0 (follows compressor) / mode 1 (temperature hysteresis by cond_temp with configurable thresholds)
+- **Head pressure recovery** — pauses hot gas defrost when condenser temperature drops below limit; resumes after recovery (3 min timeout or temperature recovery)
+- **Shared ADC1 handle** — NTC and pressure_adc drivers share single ADC1 unit (no init conflict)
 
 ---
 

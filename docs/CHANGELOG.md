@@ -2,6 +2,56 @@
 
 > Повний changelog проекту.
 
+## 2026-03-31
+
+### fix(zones): critical namespace mismatch + multi-zone hardening
+
+**Equipment namespace (CRITICAL):**
+- fix: Equipment шукав `thermostat.req.*` / `defrost.*` / `eev.*`, але модулі пишуть у `thermo_z1.*` / `defrost_z1.*` / `eev_z1.*`. Компресор, вентилятори та EEV клапан не керувались через арбітрацію. Додано namespace таблицю в on_init().
+- fix: `apply_arbitration()` valve_pos з zones_[0] замість хардкод `eev.req.valve_pos`
+- fix: Protection Z2 lockout OR-агрегація в Equipment
+- fix: Defrost interlock — per-zone перевірка типу замість глобального `defrost.type`
+- fix: Тести оновлені на зонні namespace
+
+**Protection module:**
+- fix: Icing detection — `defrost.type`/`demand_temp`/`manual_start` не zone-aware → InputBindings + resolve_input()
+
+**EEV module:**
+- fix: sensor2_ok Z2 — EEV Z2 не бачив відмову свого evap sensor (fallback global)
+- fix: Smooth Lines — thermostat.temperature/effective_setpoint без InputBindings → fallback 0.0f. Guard smooth_plt > 0.01 (div-by-zero)
+- fix: Emergency close — per-zone Equipment output path не перевіряв emergency_close flag
+- fix: Per-zone evap_temp NAN — Equipment не публікував NAN при відмові per-zone evap sensor
+- fix: LOW_SH_PROTECT recovery hysteresis +2K (Danfoss EKE practice)
+- fix: Deadband 1.0→0.5K, refrigerant index validation, `__builtin_isnan` → `std::isnan`
+- fix: safe_pos 40%→20% (Danfoss/Carel recommendation)
+
+**EEV drivers:**
+- fix: eev_analog DAC handle init-once (was create/destroy every write — zero-heap violation)
+- fix: eev_stepper + eev_pcf8574_stepper NVS save debounce 60s (was every target reached — flash wear)
+- fix: eev_pcf8574_stepper I2C error handling in do_step() (was silent position drift)
+- fix: pressure_adc ADC_OPEN_THRESHOLD 100→246 (~0.3V sensor, SPKT standard)
+- fix: configure() clamping for max_steps/cycle_ms (div-by-zero protection)
+
+**HAL:**
+- fix: Shared ADC1 handle — NTC + PressureAdc мали окремі static handles → другий driver fails init()
+- feat: `adc_shared.h/.cpp` — `get_shared_adc1_handle()` для всіх ADC drivers
+
+**Defrost module:**
+- fix: manual_start flag не cleared під час active defrost → подвійний цикл
+- fix: Z2 InputBindings — додано air_temp_z2 та sensor1_z2_ok для ΔT trigger
+- fix: Natural defrost (type=0) blocked в multi-zone systems (fallback electric)
+
+**Equipment — condenser fan + head pressure control:**
+- feat: Condenser fan mode 0 (follows compressor) / mode 1 (temperature hysteresis)
+- feat: Head pressure recovery — пауза ГГ defrost при cond_temp < low_limit (3 хв)
+- feat: Multi-zone defrost арбітрація — cond_fan OR(defrost, thermostat), safety rule
+- feat: Settings: cond_fan_mode, cond_fan_on (40°C), cond_fan_off (30°C), cond_fan_low_limit (20°C)
+
+**Documentation:**
+- docs: CLAUDE.md — comprehensive project guide
+- docs: Modbus Master — documented 6 known issues (incomplete skeleton)
+- docs: Equipment header Doxygen — оновлено zone-aware keys
+
 ## 2026-03-30
 
 ### refactor(tech-debt): 12 fixes — zones, HAL, bindings, protection, UI

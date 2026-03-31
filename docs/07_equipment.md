@@ -49,22 +49,51 @@ IActuatorDriver). Бізнес-модулі (Thermostat, Defrost, Protection) с
 | Пріоритет | Джерело | Умова | Дія |
 |-----------|---------|-------|-----|
 | 1 (найвищий) | Protection | `protection.lockout = true` | Все OFF |
-| 2 | Defrost | `defrost.active = true` | defrost.req.* визначають outputs |
-| 3 (найнижчий) | Thermostat | нормальний режим | thermostat.req.* визначають outputs |
+| 2 | Protection | `compressor_blocked / condenser_blocked` | Тільки компресор OFF |
+| 3 | Defrost | `defrost_z{n}.active = true` | defrost.req.* + thermostat cond_fan OR |
+| 4 (найнижчий) | Thermostat | нормальний режим | thermo_z{n}.req.* визначають outputs |
 
-**SharedState keys, що читаються (requests):**
+**Multi-zone арбітрація (zone_count >= 2):**
+
+| Вихід | Логіка | Коментар |
+|-------|--------|----------|
+| Компресор | defrost priority | Natural defrost → OFF; Hot gas → ON |
+| Defrost relay | per-zone | Кожна зона керує своїм реле |
+| Evap fan | per-zone | Defrost керує fan своєї зони, thermostat — своєї |
+| **Cond fan** | **OR(defrost, thermostat)** | Safety: ON коли компресор ON |
+
+**Natural defrost (type=0) заблокований** в 2+ зонних системах — зупинка shared компресора зупиняє охолодження всіх зон. Fallback: electric (type=1) якщо є реле.
+
+**Head pressure recovery** при ГГ defrost + cooling:
+- `cond_temp < cond_fan_low_limit` → cond_fan OFF + defrost_relay OFF (пауза 3 хв)
+- Компресор ON → тиск нагнітання росте
+- Відновлення при `cond_temp > cond_fan_off` або по таймеру → defrost продовжується
+
+**SharedState keys, що читаються (requests, per-zone):**
 
 | Key | Джерело | Опис |
 |-----|---------|------|
-| `thermostat.req.compressor` | Thermostat | Запит на компресор |
-| `thermostat.req.evap_fan` | Thermostat | Запит на вент. випарника |
-| `thermostat.req.cond_fan` | Thermostat | Запит на вент. конденсатора |
-| `defrost.active` | Defrost | Defrost активний (пріоритетний режим) |
-| `defrost.req.compressor` | Defrost | Запит на компресор (FAD фаза) |
-| `defrost.req.defrost_relay` | Defrost | Запит на реле відтайки |
-| `defrost.req.evap_fan` | Defrost | Запит на вент. випарника |
-| `defrost.req.cond_fan` | Defrost | Запит на вент. конденсатора |
-| `protection.lockout` | Protection | Аварійна зупинка (зарезервовано) |
+| `thermo_z{n}.req.compressor` | Thermostat | Запит на компресор |
+| `thermo_z{n}.req.evap_fan` | Thermostat | Запит на вент. випарника |
+| `thermo_z{n}.req.cond_fan` | Thermostat | Запит на вент. конденсатора |
+| `defrost_z{n}.active` | Defrost | Defrost активний |
+| `defrost_z{n}.req.compressor` | Defrost | Запит на компресор (ГГ/FAD) |
+| `defrost_z{n}.req.defrost_relay` | Defrost | Запит на реле відтайки |
+| `defrost_z{n}.req.evap_fan` | Defrost | Запит на вент. випарника |
+| `defrost_z{n}.req.cond_fan` | Defrost | Запит на вент. конденсатора |
+| `eev_z{n}.req.valve_pos` | EEV | Позиція клапана 0-100% |
+| `eev_z{n}.req.emergency_close` | EEV | Аварійне закриття (subcooled) |
+| `protection.lockout` | Protection | Аварійна зупинка (OR з protection_z2) |
+| `protection.compressor_blocked` | Protection | Примусова зупинка компресора |
+
+### Condenser fan head pressure control
+
+| Параметр | Default | Опис |
+|----------|---------|------|
+| `cond_fan_mode` | 0 | 0=follows compressor, 1=за T конденсатора |
+| `cond_fan_on` | 40°C | Увімкнення вентилятора |
+| `cond_fan_off` | 30°C | Вимкнення вентилятора |
+| `cond_fan_low_limit` | 20°C | Захист: T нижче → fan OFF + defrost pause |
 
 ### Compressor anti-short-cycle (output-level)
 
