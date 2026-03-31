@@ -313,10 +313,13 @@ void ThermostatModule::on_update(uint32_t dt_ms) {
         last_display_temp_ = current_temp_;
     }
 
-    // 4. Оновлюємо таймери по ФАКТИЧНОМУ стану компресора (BUG-009 fix)
+    // 4. Оновлюємо таймери по ВЛАСНОМУ REQUEST стану (не shared actual).
+    // В multi-zone shared компресор може бути ON через іншу зону —
+    // min_off/min_on таймери мають рахуватись по запиту ЦІЄї зони,
+    // інакше Zone 2 не увійде в COOLING якщо Zone 1 тримає comp ON.
+    // Equipment anti-short-cycle (output-level) гарантує safety незалежно.
     state_timer_ms_ += dt_ms;
-    bool comp_actual = read_input_bool("equipment.compressor");
-    if (comp_actual) {
+    if (compressor_on_) {
         comp_on_time_ms_ += dt_ms;
     } else {
         comp_off_time_ms_ += dt_ms;
