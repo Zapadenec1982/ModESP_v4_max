@@ -27,16 +27,19 @@
  *   equipment.evap_fan       — bool, actual relay state
  *   equipment.cond_fan       — bool, actual relay state
  *
- * SharedState keys read (requests from other modules):
- *   thermostat.req.compressor    — bool
- *   thermostat.req.evap_fan      — bool
- *   thermostat.req.cond_fan      — bool
- *   defrost.active               — bool
- *   defrost.req.compressor       — bool
- *   defrost.req.defrost_relay    — bool
- *   defrost.req.evap_fan         — bool
- *   defrost.req.cond_fan         — bool
- *   protection.lockout           — bool
+ * SharedState keys read (requests from other modules, per-zone):
+ *   thermo_z{n}.req.compressor    — bool (OR across zones)
+ *   thermo_z{n}.req.evap_fan      — bool
+ *   thermo_z{n}.req.cond_fan      — bool
+ *   defrost_z{n}.active           — bool
+ *   defrost_z{n}.req.compressor   — bool
+ *   defrost_z{n}.req.defrost_relay — bool
+ *   defrost_z{n}.req.evap_fan     — bool
+ *   defrost_z{n}.req.cond_fan     — bool
+ *   eev_z{n}.req.valve_pos        — float (0-100%)
+ *   eev_z{n}.req.emergency_close  — bool (one-shot)
+ *   protection.lockout            — bool (OR with protection_z2)
+ *   protection.compressor_blocked — bool (OR with protection_z2)
  */
 
 #pragma once

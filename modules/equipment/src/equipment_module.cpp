@@ -406,10 +406,17 @@ void EquipmentModule::read_sensors() {
 
             // Per-zone suction pressure
             if (zones_[z].pressure_sensor) {
-                if (zones_[z].pressure_sensor->read(val)) {
+                bool p_healthy = zones_[z].pressure_sensor->is_healthy();
+                if (p_healthy && zones_[z].pressure_sensor->read(val)) {
                     snprintf(key, sizeof(key), "equipment.suction_bar_z%d", zn);
                     state_set(key, roundf(val * 100.0f) / 100.0f);
+                } else if (!p_healthy) {
+                    snprintf(key, sizeof(key), "equipment.suction_bar_z%d", zn);
+                    state_set(key, NAN);
                 }
+                // Runtime health → EEV перейде в SENSOR_FAULT при відмові
+                snprintf(key, sizeof(key), "equipment.has_suction_p_z%d", zn);
+                state_set(key, p_healthy);
             }
         }
     }
@@ -448,7 +455,7 @@ void EquipmentModule::read_backup_sensor(float alpha) {
     // Auto-calculate offset (ro) коли обидва OK
     bool primary_ok = sensor_air_ && sensor_air_->is_healthy();
     bool backup_ok  = sensor_backup_->is_healthy();
-    if (primary_ok && backup_ok && !__builtin_isnan(air_temp_) && !__builtin_isnan(backup_temp_)) {
+    if (primary_ok && backup_ok && !std::isnan(air_temp_) && !std::isnan(backup_temp_)) {
         float diff = air_temp_ - backup_temp_;
         float ro_alpha = 0.01f;  // Повільна EMA для offset (~100 sample window)
         if (!ro_ema_init_) { ro_ema_ = diff; ro_ema_init_ = true; }
@@ -516,7 +523,7 @@ void EquipmentModule::compute_air_temp() {
         int   count = 0;
 
         for (size_t i = 0; i < MAX_AIR_ZONES; i++) {
-            if (zone_sensors_[i] && zone_sensors_[i]->is_healthy() && !__builtin_isnan(zone_temps_[i])) {
+            if (zone_sensors_[i] && zone_sensors_[i]->is_healthy() && !std::isnan(zone_temps_[i])) {
                 sum += zone_temps_[i];
                 if (zone_temps_[i] > max_val) max_val = zone_temps_[i];
                 if (zone_temps_[i] < min_val) min_val = zone_temps_[i];
