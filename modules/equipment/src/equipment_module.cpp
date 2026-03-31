@@ -674,10 +674,23 @@ void EquipmentModule::apply_arbitration() {
 
     // Defrost active = defrost requests мають пріоритет (any zone)
     if (req_.any_defrost_active) {
+        // Компресор: defrost має пріоритет.
+        // Natural (type=0): defrost wants comp OFF → comp OFF (не можна тепло)
+        // Electric (type=1): defrost wants comp OFF → інтерлок нижче підтвердить
+        // Hot Gas (type=2): defrost wants comp ON → comp ON (потрібен потік)
+        // Якщо інша зона хоче comp ON але defrost хоче OFF → defrost wins
+        // (інакше фреон тече через випарник і не розмерзає)
         out_.compressor    = req_.any_def_compressor;
         out_.defrost_relay = req_.any_def_defrost_relay;
         out_.evap_fan      = req_.any_def_evap_fan;
-        out_.cond_fan      = req_.any_def_cond_fan;
+
+        // Конденсаторний вентилятор: OR defrost + thermostat.
+        // Multi-zone конфлікт: Zone 1 cooling + Zone 2 ГГ defrost —
+        // defrost хоче cond_fan OFF (більше тепла у випарник),
+        // але comp ON без конд.вент → зростання тиску → HP alarm.
+        // Safety: якщо comp ON → cond_fan ON (handled нижче як safety rule).
+        out_.cond_fan      = req_.any_def_cond_fan || req_.any_therm_cond_fan;
+
         // Логуємо тільки при вході в defrost (не кожен цикл)
         if (!prev_defrost_active_) {
             ESP_LOGI(TAG, "DEFROST arb START: comp=%d relay=%d efan=%d cfan=%d",
@@ -715,6 +728,14 @@ void EquipmentModule::apply_arbitration() {
                          comp_since_ms_, COMP_MIN_ON_MS);
             }
         }
+    }
+
+    // === Safety: конд.вент ON коли компресор ON ===
+    // Запобігає зростанню тиску нагнітання → HP alarm.
+    // Стандарт Dixell/Danfoss: cond_fan follows compressor.
+    // Виняток: condenser_blocked від Protection.
+    if (out_.compressor && cond_fan_) {
+        out_.cond_fan = true;
     }
 
     // === Protection compressor block (forced off при continuous run) ===
