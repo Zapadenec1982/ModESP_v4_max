@@ -203,6 +203,20 @@ private:
     // Defrost transition tracking (логуємо тільки при зміні стану)
     bool prev_defrost_active_ = false;
 
+    // ── Condenser fan temperature control ──
+    // Mode 0: follows compressor (classic)
+    // Mode 1: hysteresis by cond_temp (head pressure control)
+    //   cond_temp > cond_fan_on_  → fan ON
+    //   cond_temp < cond_fan_off_ → fan OFF
+    //   cond_temp < cond_fan_low_limit_ → fan OFF + low_pressure_alarm
+    void apply_cond_fan_control();
+
+    // Head pressure recovery: пауза ГГ defrost при низькій T конденсації.
+    // Закриває defrost relay на recovery_pause_ms_, компресор ON → тиск росте.
+    bool     hp_recovery_active_   = false;
+    uint32_t hp_recovery_timer_ms_ = 0;
+    static constexpr uint32_t HP_RECOVERY_PAUSE_MS = 180000;  // 3 хв пауза
+
     // AUDIT-003: Compressor anti-short-cycle на рівні виходу (output-level).
     // Захищає компресор незалежно від джерела запиту (thermostat/defrost).
     // Доповнює, а не замінює таймери thermostat (ті працюють для state machine логіки).

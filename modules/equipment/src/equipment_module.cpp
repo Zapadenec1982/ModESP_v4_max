@@ -268,6 +268,13 @@ void EquipmentModule::on_update(uint32_t dt_ms) {
     // 2. Читаємо requests від бізнес-модулів
     read_requests();
 
+    // Head pressure recovery timer (після read_requests — потрібен req_.any_defrost_active)
+    if (hp_recovery_active_) {
+        hp_recovery_timer_ms_ += dt_ms;
+    } else if (!req_.any_defrost_active) {
+        hp_recovery_timer_ms_ = 0;
+    }
+
     // 3. Арбітраж + інтерлоки → визначаємо outputs
     apply_arbitration();
 
@@ -730,13 +737,8 @@ void EquipmentModule::apply_arbitration() {
         }
     }
 
-    // === Safety: конд.вент ON коли компресор ON ===
-    // Запобігає зростанню тиску нагнітання → HP alarm.
-    // Стандарт Dixell/Danfoss: cond_fan follows compressor.
-    // Виняток: condenser_blocked від Protection.
-    if (out_.compressor && cond_fan_) {
-        out_.cond_fan = true;
-    }
+    // === Condenser fan control (head pressure management) ===
+    apply_cond_fan_control();
 
     // === Protection compressor block (forced off при continuous run) ===
     // Тільки компресор OFF, вентилятори працюють за нормальним арбітражем.
@@ -788,6 +790,85 @@ void EquipmentModule::apply_arbitration() {
     // === Освітлення — незалежне від refrigeration arbitration ===
     // Не залежить від lockout, defrost, protection
     out_.light = req_.light_request;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Condenser fan — temperature-based head pressure control
+// ═══════════════════════════════════════════════════════════════
+
+void EquipmentModule::apply_cond_fan_control() {
+    if (!cond_fan_) return;
+
+    // Mode 0: classic — fan follows compressor (fallback if no cond sensor)
+    // Mode 1: hysteresis by condenser temperature (head pressure control)
+    int32_t cond_fan_mode = read_int(ns_key("cond_fan_mode"), 0);
+
+    if (cond_fan_mode == 0 || !sensor_cond_ || std::isnan(cond_temp_)) {
+        // Classic mode або немає датчика конденсатора:
+        // cond_fan ON коли компресор ON (Dixell/Danfoss standard)
+        if (out_.compressor) {
+            out_.cond_fan = true;
+        }
+        return;
+    }
+
+    // Mode 1: Temperature hysteresis (head pressure control)
+    // Схоже на Danfoss параметр F11/F12 або CAREL cFn параметр
+    float fan_on_temp  = read_float(ns_key("cond_fan_on"),  40.0f);  // °C — ввімкнути
+    float fan_off_temp = read_float(ns_key("cond_fan_off"), 30.0f);  // °C — вимкнути
+    float low_limit    = read_float(ns_key("cond_fan_low_limit"), 20.0f); // °C — захист
+
+    if (!out_.compressor) {
+        // Компресор OFF → вентилятор OFF
+        out_.cond_fan = false;
+        return;
+    }
+
+    // ── Head pressure recovery: пауза ГГ defrost при низькій T конденсації ──
+    // Якщо cond_temp < low_limit під час ГГ defrost:
+    //   1. cond_fan OFF (зменшити тепловідведення)
+    //   2. defrost_relay OFF (пауза — закрити клапан ГГ)
+    //   3. Компресор ON → тиск нагнітання росте
+    //   4. Пауза HP_RECOVERY_PAUSE_MS (3 хв) або до recovery (fan_off_temp)
+    //   5. Відновлення defrost relay → ГГ defrost з повною потужністю
+    if (cond_temp_ < low_limit && req_.any_defrost_active && out_.compressor) {
+        out_.cond_fan = false;
+
+        if (!hp_recovery_active_) {
+            hp_recovery_active_ = true;
+            hp_recovery_timer_ms_ = 0;
+            ESP_LOGW(TAG, "HEAD PRESSURE RECOVERY: cond=%.1f°C < %.1f — defrost paused",
+                     cond_temp_, low_limit);
+        }
+    }
+
+    if (hp_recovery_active_) {
+        out_.cond_fan = false;
+        out_.defrost_relay = false;  // Пауза: закриваємо клапан ГГ
+
+        // Відновлення: T конденсації піднялась вище fan_off АБО таймер вичерпано
+        if (cond_temp_ >= fan_off_temp || hp_recovery_timer_ms_ >= HP_RECOVERY_PAUSE_MS) {
+            hp_recovery_active_ = false;
+            ESP_LOGI(TAG, "Head pressure recovered (cond=%.1f°C, pause=%lus) — defrost resumed",
+                     cond_temp_, hp_recovery_timer_ms_ / 1000);
+            // defrost_relay повернеться до req_ значення в наступному циклі арбітрації
+        }
+        return;
+    }
+
+    // Не defrost або recovery не потрібен → чисте закриття при low_limit
+    if (cond_temp_ < low_limit) {
+        out_.cond_fan = false;
+        return;
+    }
+
+    // Гістерезисне керування
+    if (cond_temp_ >= fan_on_temp) {
+        out_.cond_fan = true;
+    } else if (cond_temp_ <= fan_off_temp) {
+        out_.cond_fan = false;
+    }
+    // Між fan_off і fan_on → зберігає попередній стан (гістерезис)
 }
 
 // ═══════════════════════════════════════════════════════════════

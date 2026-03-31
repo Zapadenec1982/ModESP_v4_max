@@ -92,6 +92,23 @@
                                   "min": 0, "max": 10, "step": 1, "default": 4,
                                   "description": "Цифровий фільтр"},
 
+    "equipment.cond_fan_mode":   {"type": "int", "access": "readwrite", "persist": true,
+                                  "default": 0,
+                                  "options": [
+                                    {"value": 0, "label": "Слідує за компресором"},
+                                    {"value": 1, "label": "За температурою конденсатора"}
+                                  ],
+                                  "description": "Режим вентилятора конденсатора"},
+    "equipment.cond_fan_on":     {"type": "float", "access": "readwrite", "persist": true,
+                                  "min": 25.0, "max": 60.0, "step": 1.0, "default": 40.0,
+                                  "unit": "°C", "description": "Увімкнення вент. конденсатора"},
+    "equipment.cond_fan_off":    {"type": "float", "access": "readwrite", "persist": true,
+                                  "min": 15.0, "max": 50.0, "step": 1.0, "default": 30.0,
+                                  "unit": "°C", "description": "Вимкнення вент. конденсатора"},
+    "equipment.cond_fan_low_limit": {"type": "float", "access": "readwrite", "persist": true,
+                                  "min": 5.0, "max": 35.0, "step": 1.0, "default": 20.0,
+                                  "unit": "°C", "description": "Захист від низької T конденсації"},
+
     "equipment.ntc_beta":        {"type": "int",   "access": "readwrite", "persist": true,
                                   "min": 2000, "max": 5000, "step": 1, "default": 3950,
                                   "description": "B-коефіцієнт NTC"},
@@ -216,6 +233,24 @@
            "visible_when": {"key": "equipment.has_ntc_driver", "eq": true}},
           {"key": "equipment.ntc_r_nominal", "widget": "number_input", "label": "NTC R номінальний", "unit": "Ω",
            "visible_when": {"key": "equipment.has_ntc_driver", "eq": true}}
+        ]
+      },
+      {
+        "title": "Вент. конденсатора",
+        "icon": "wind",
+        "icon_color": "blue",
+        "subtitle": "Head pressure control",
+        "group": "service",
+        "collapsible": true,
+        "visible_when": {"key": "equipment.has_cond_fan", "eq": true},
+        "widgets": [
+          {"key": "equipment.cond_fan_mode", "widget": "select", "label": "Режим"},
+          {"key": "equipment.cond_fan_on", "widget": "number_input", "label": "T увімкнення", "unit": "°C",
+           "visible_when": {"key": "equipment.cond_fan_mode", "eq": 1}},
+          {"key": "equipment.cond_fan_off", "widget": "number_input", "label": "T вимкнення", "unit": "°C",
+           "visible_when": {"key": "equipment.cond_fan_mode", "eq": 1}},
+          {"key": "equipment.cond_fan_low_limit", "widget": "number_input", "label": "Захист мін. T", "unit": "°C",
+           "visible_when": {"key": "equipment.cond_fan_mode", "eq": 1}}
         ]
       },
       {
