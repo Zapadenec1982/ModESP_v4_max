@@ -146,6 +146,18 @@ bool EquipmentModule::on_init() {
     state_set(ns_key("active_zones"), static_cast<int32_t>(zone_count_));
     ESP_LOGI(TAG, "Active zones: %d", (int)zone_count_);
 
+    // Встановлюємо namespace для зонних модулів — МУСИТЬ збігатися
+    // з ns_ параметром модулів у main.cpp (thermo_z1, defrost_z1, eev_z1 тощо).
+    // Без цього Equipment шукає "thermostat.req.*" замість "thermo_z1.req.*".
+    static const char* thermo_ns_table[]  = {"thermo_z1",  "thermo_z2",  "thermo_z3",  "thermo_z4"};
+    static const char* defrost_ns_table[] = {"defrost_z1", "defrost_z2", "defrost_z3", "defrost_z4"};
+    static const char* eev_ns_table[]     = {"eev_z1",     "eev_z2",     "eev_z3",     "eev_z4"};
+    for (size_t z = 0; z < MAX_ZONES; z++) {
+        zones_[z].thermo_ns  = thermo_ns_table[z];
+        zones_[z].defrost_ns = defrost_ns_table[z];
+        zones_[z].eev_ns     = eev_ns_table[z];
+    }
+
     // Publish zone enable flags — zone modules check this to skip on_update()
     state_set("equipment.zone2_enabled", zone_count_ >= 2);
     state_set("equipment.zone3_enabled", zone_count_ >= 3);
@@ -571,11 +583,17 @@ void EquipmentModule::read_requests() {
     // Block I: Read requests from all zones (OR aggregation)
     read_zone_requests();
 
-    // Protection (shared across all zones)
+    // Protection (OR across all protection instances)
     req_.protection_lockout  = read_input_bool("protection.lockout");
     req_.compressor_blocked  = read_input_bool("protection.compressor_blocked");
     req_.condenser_blocked   = read_input_bool("protection.condenser_block");
     req_.door_comp_blocked   = read_input_bool("protection.door_comp_blocked");
+
+    // Zone 2+ protection: OR-агрегація lockout та compressor_blocked
+    if (zone_count_ >= 2) {
+        req_.protection_lockout |= read_input_bool("protection_z2.lockout");
+        req_.compressor_blocked |= read_input_bool("protection_z2.compressor_blocked");
+    }
 
     // Lighting (independent)
     req_.light_request = read_input_bool("lighting.req.light");
@@ -705,13 +723,19 @@ void EquipmentModule::apply_arbitration() {
 
     // Електрична відтайка (тен) і компресор НІКОЛИ одночасно.
     // Гарячий газ: компресор потрібен — інтерлок НЕ застосовується.
-    // Перевіряємо defrost.type щоб визначити чи реле = тен (type=1).
+    // Перевіряємо тип дефросту кожної активної зони.
     if (out_.defrost_relay && out_.compressor) {
-        int defrost_type = read_input_int("defrost.type", 0);
-        if (defrost_type == 1) {
-            // Електричний тен — компресор OFF
-            out_.compressor = false;
-            ESP_LOGW(TAG, "INTERLOCK: heater+compressor → compressor OFF");
+        char dt_key[48];
+        for (size_t z = 0; z < zone_count_; z++) {
+            if (!zones_[z].defrost_active) continue;
+            snprintf(dt_key, sizeof(dt_key), "%s.type", zones_[z].defrost_ns);
+            int defrost_type = read_int(dt_key, 0);
+            if (defrost_type == 1) {
+                // Електричний тен — компресор OFF
+                out_.compressor = false;
+                ESP_LOGW(TAG, "INTERLOCK: heater+compressor → compressor OFF (zone %d)", (int)(z+1));
+                break;
+            }
         }
         // defrost_type == 2 (ГГ): обидва ON — це нормально
     }
@@ -724,11 +748,10 @@ void EquipmentModule::apply_arbitration() {
     // гідроудар при наступному старті → поломка компресора.
     // Клапан ЗАВЖДИ закривається раніше або одночасно з компресором.
     if (!out_.compressor) {
-        // Compressor OFF → valve must be closed (0%)
         out_.valve_pos = 0.0f;
     } else {
-        // Compressor ON → use EEV module request
-        out_.valve_pos = read_input_float("eev.req.valve_pos", 0.0f);
+        // Використовуємо значення з read_zone_requests() (zones_[0] для single-zone)
+        out_.valve_pos = zones_[0].eev_valve_pos;
     }
 
     // === Освітлення — незалежне від refrigeration arbitration ===

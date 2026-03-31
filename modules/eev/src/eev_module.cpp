@@ -219,6 +219,11 @@ void EevModule::on_update(uint32_t dt_ms) {
     //    Use dew_point_temp() — correct for zeotropic blends (glide > 0).
     //    For azeotropes (glide=0) returns identical to saturation_temp().
     if (pressure_ok_ && suction_bar_ > 0.0f) {
+        // Валідація індексу холодоагенту
+        if (refrigerant_idx_ < 0 || refrigerant_idx_ >= static_cast<int32_t>(modesp::REFRIGERANT_COUNT)) {
+            ESP_LOGW(TAG, "Invalid refrigerant index %ld, fallback R134a", (long)refrigerant_idx_);
+            refrigerant_idx_ = 0;
+        }
         auto ref = static_cast<modesp::Refrigerant>(refrigerant_idx_);
         t_sat_ = modesp::dew_point_temp(ref, suction_bar_);
         superheat_ = evap_temp_ - t_sat_;

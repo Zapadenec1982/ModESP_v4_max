@@ -177,9 +177,9 @@ TEST_CASE_FIXTURE(EquipFixture, "night sensor publishes night_input") {
 // ── 4. Thermostat arbitration (normal mode) ──
 
 TEST_CASE_FIXTURE(EquipFixture, "thermostat requests drive outputs in normal mode") {
-    state.set("thermostat.req.compressor", true);
-    state.set("thermostat.req.evap_fan", true);
-    state.set("thermostat.req.cond_fan", true);
+    state.set("thermo_z1.req.compressor", true);
+    state.set("thermo_z1.req.evap_fan", true);
+    state.set("thermo_z1.req.cond_fan", true);
 
     // Спочатку потрібно задовольнити anti-short-cycle
     // comp_since_ms_ ініціалізується як TIMER_SATISFIED, тому перший ON проходить
@@ -192,7 +192,7 @@ TEST_CASE_FIXTURE(EquipFixture, "thermostat requests drive outputs in normal mod
 }
 
 TEST_CASE_FIXTURE(EquipFixture, "defrost_relay stays OFF in normal mode") {
-    state.set("thermostat.req.compressor", true);
+    state.set("thermo_z1.req.compressor", true);
     tick();
     CHECK(defrost_relay.get_state() == false);
 }
@@ -201,15 +201,15 @@ TEST_CASE_FIXTURE(EquipFixture, "defrost_relay stays OFF in normal mode") {
 
 TEST_CASE_FIXTURE(EquipFixture, "defrost active overrides thermostat") {
     // Thermostat wants compressor ON
-    state.set("thermostat.req.compressor", true);
-    state.set("thermostat.req.evap_fan", true);
+    state.set("thermo_z1.req.compressor", true);
+    state.set("thermo_z1.req.evap_fan", true);
 
     // Defrost is active — wants compressor OFF, defrost_relay ON, evap_fan OFF
-    state.set("defrost.active", true);
-    state.set("defrost.req.compressor", false);
-    state.set("defrost.req.defrost_relay", true);
-    state.set("defrost.req.evap_fan", false);
-    state.set("defrost.req.cond_fan", false);
+    state.set("defrost_z1.active", true);
+    state.set("defrost_z1.req.compressor", false);
+    state.set("defrost_z1.req.defrost_relay", true);
+    state.set("defrost_z1.req.evap_fan", false);
+    state.set("defrost_z1.req.cond_fan", false);
 
     tick();
 
@@ -220,10 +220,10 @@ TEST_CASE_FIXTURE(EquipFixture, "defrost active overrides thermostat") {
 }
 
 TEST_CASE_FIXTURE(EquipFixture, "hot gas defrost allows compressor + defrost_relay") {
-    state.set("defrost.active", true);
-    state.set("defrost.req.compressor", true);
-    state.set("defrost.req.defrost_relay", true);
-    state.set("defrost.type", static_cast<int32_t>(2));  // hot gas
+    state.set("defrost_z1.active", true);
+    state.set("defrost_z1.req.compressor", true);
+    state.set("defrost_z1.req.defrost_relay", true);
+    state.set("defrost_z1.type", static_cast<int32_t>(2));  // hot gas
 
     tick();
 
@@ -235,10 +235,10 @@ TEST_CASE_FIXTURE(EquipFixture, "hot gas defrost allows compressor + defrost_rel
 // ── 6. Electric defrost interlock ──
 
 TEST_CASE_FIXTURE(EquipFixture, "electric defrost interlock: compressor OFF") {
-    state.set("defrost.active", true);
-    state.set("defrost.req.compressor", true);
-    state.set("defrost.req.defrost_relay", true);
-    state.set("defrost.type", static_cast<int32_t>(1));  // electric heater
+    state.set("defrost_z1.active", true);
+    state.set("defrost_z1.req.compressor", true);
+    state.set("defrost_z1.req.defrost_relay", true);
+    state.set("defrost_z1.type", static_cast<int32_t>(1));  // electric heater
 
     tick();
 
@@ -250,9 +250,9 @@ TEST_CASE_FIXTURE(EquipFixture, "electric defrost interlock: compressor OFF") {
 // ── 7. Protection lockout ──
 
 TEST_CASE_FIXTURE(EquipFixture, "protection lockout turns everything OFF") {
-    state.set("thermostat.req.compressor", true);
-    state.set("thermostat.req.evap_fan", true);
-    state.set("thermostat.req.cond_fan", true);
+    state.set("thermo_z1.req.compressor", true);
+    state.set("thermo_z1.req.evap_fan", true);
+    state.set("thermo_z1.req.cond_fan", true);
     tick();
 
     // Все ввімкнено
@@ -271,8 +271,8 @@ TEST_CASE_FIXTURE(EquipFixture, "protection lockout turns everything OFF") {
 // ── 8. Protection compressor_blocked ──
 
 TEST_CASE_FIXTURE(EquipFixture, "compressor_blocked forces compressor OFF only") {
-    state.set("thermostat.req.compressor", true);
-    state.set("thermostat.req.evap_fan", true);
+    state.set("thermo_z1.req.compressor", true);
+    state.set("thermo_z1.req.evap_fan", true);
     tick();
 
     CHECK(comp.get_state() == true);
@@ -292,18 +292,18 @@ TEST_CASE_FIXTURE(EquipFixture, "compressor_blocked forces compressor OFF only")
 
 TEST_CASE_FIXTURE(EquipFixture, "anti-short-cycle blocks early ON") {
     // Ввімкнути компресор
-    state.set("thermostat.req.compressor", true);
+    state.set("thermo_z1.req.compressor", true);
     tick();
     CHECK(comp.get_state() == true);
 
     // Вимкнути після min ON (120s)
-    state.set("thermostat.req.compressor", false);
+    state.set("thermo_z1.req.compressor", false);
     tick(120001);
     tick();
     CHECK(comp.get_state() == false);
 
     // Спроба ввімкнути через 10 сек — заблоковано (min OFF = 180s)
-    state.set("thermostat.req.compressor", true);
+    state.set("thermo_z1.req.compressor", true);
     tick(10000);
     tick();
     CHECK(comp.get_state() == false);
@@ -316,12 +316,12 @@ TEST_CASE_FIXTURE(EquipFixture, "anti-short-cycle blocks early ON") {
 
 TEST_CASE_FIXTURE(EquipFixture, "anti-short-cycle blocks early OFF") {
     // Ввімкнути компресор
-    state.set("thermostat.req.compressor", true);
+    state.set("thermo_z1.req.compressor", true);
     tick();
     CHECK(comp.get_state() == true);
 
     // Спроба вимкнути через 10 сек — заблоковано (min ON = 120s)
-    state.set("thermostat.req.compressor", false);
+    state.set("thermo_z1.req.compressor", false);
     tick(10000);
     tick();
     CHECK(comp.get_state() == true);
@@ -335,13 +335,13 @@ TEST_CASE_FIXTURE(EquipFixture, "anti-short-cycle blocks early OFF") {
 // ── 10. Actual state publication ──
 
 TEST_CASE_FIXTURE(EquipFixture, "publishes actual relay state via get_state()") {
-    state.set("thermostat.req.compressor", true);
+    state.set("thermo_z1.req.compressor", true);
     tick();
 
     // SharedState = фактичний стан реле
     CHECK(get_bool(state, "equipment.compressor") == true);
 
-    state.set("thermostat.req.compressor", false);
+    state.set("thermo_z1.req.compressor", false);
     tick(120001);
     tick();
     CHECK(get_bool(state, "equipment.compressor") == false);
@@ -371,8 +371,8 @@ TEST_CASE_FIXTURE(EquipFixture, "EMA filter smooths temperature changes") {
 // ── 12. on_stop ──
 
 TEST_CASE_FIXTURE(EquipFixture, "on_stop turns everything OFF") {
-    state.set("thermostat.req.compressor", true);
-    state.set("thermostat.req.evap_fan", true);
+    state.set("thermo_z1.req.compressor", true);
+    state.set("thermo_z1.req.evap_fan", true);
     tick();
     CHECK(comp.get_state() == true);
 
@@ -424,9 +424,9 @@ TEST_CASE_FIXTURE(EquipFixture, "condenser temp published to SharedState") {
 // ── 15. Lockout overrides defrost ──
 
 TEST_CASE_FIXTURE(EquipFixture, "lockout overrides defrost") {
-    state.set("defrost.active", true);
-    state.set("defrost.req.compressor", true);
-    state.set("defrost.req.defrost_relay", true);
+    state.set("defrost_z1.active", true);
+    state.set("defrost_z1.req.compressor", true);
+    state.set("defrost_z1.req.defrost_relay", true);
     state.set("protection.lockout", true);
 
     tick();
@@ -438,14 +438,14 @@ TEST_CASE_FIXTURE(EquipFixture, "lockout overrides defrost") {
 // ── 16. Normal mode restored after defrost ends ──
 
 TEST_CASE_FIXTURE(EquipFixture, "normal mode restored after defrost ends") {
-    state.set("thermostat.req.compressor", true);
-    state.set("defrost.active", true);
-    state.set("defrost.req.compressor", false);
+    state.set("thermo_z1.req.compressor", true);
+    state.set("defrost_z1.active", true);
+    state.set("defrost_z1.req.compressor", false);
     tick();
     CHECK(comp.get_state() == false);
 
     // Defrost завершується
-    state.set("defrost.active", false);
+    state.set("defrost_z1.active", false);
     tick();
     CHECK(comp.get_state() == true);
 }

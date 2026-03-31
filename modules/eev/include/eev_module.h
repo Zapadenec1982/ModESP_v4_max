@@ -75,7 +75,7 @@ private:
     float low_sh_limit_ = 2.0f;    // Low SH protection threshold (K)
     float mop_pressure_ = 0.0f;    // MOP bar (0=disabled)
     float lop_pressure_ = 0.0f;    // LOP bar (0=disabled)
-    float deadband_ = 1.0f;        // Anti-hunting deadband (K)
+    float deadband_ = 0.5f;        // Anti-hunting deadband (K)
     uint32_t pi_interval_ms_ = 3000;  // PI calculation interval
     uint32_t exercise_interval_ms_ = 86400000;  // Valve exercise interval (default 24h, 0=off)
 
