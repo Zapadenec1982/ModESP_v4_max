@@ -342,9 +342,9 @@ void EevModule::on_update(uint32_t dt_ms) {
                     // Smooth Lines: modulate SH target based on cabinet temperature
                     effective_sh_target_ = sh_target_;
                     if (smooth_lines_enabled_) {
-                        float cab_temp = read_input_float("thermostat.temperature");
-                        float setpoint = read_input_float("thermostat.effective_setpoint");
-                        if (!__builtin_isnan(cab_temp) && !__builtin_isnan(setpoint)) {
+                        float cab_temp = read_input_float("thermostat.temperature", NAN);
+                        float setpoint = read_input_float("thermostat.effective_setpoint", NAN);
+                        if (!std::isnan(cab_temp) && !std::isnan(setpoint) && smooth_plt_ > 0.01f) {
                             float diff = cab_temp - setpoint;
                             if (diff < -smooth_plt_) {
                                 // Temp below setpoint - PLt → max SH offset (close valve)

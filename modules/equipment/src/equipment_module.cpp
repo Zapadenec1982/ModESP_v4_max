@@ -396,6 +396,9 @@ void EquipmentModule::read_sensors() {
                 if (zones_[z].evap_sensor->read(val)) {
                     snprintf(key, sizeof(key), "equipment.evap_temp_z%d", zn);
                     state_set(key, roundf(val * 100.0f) / 100.0f);
+                } else if (!zones_[z].evap_sensor->is_healthy()) {
+                    snprintf(key, sizeof(key), "equipment.evap_temp_z%d", zn);
+                    state_set(key, NAN);
                 }
                 snprintf(key, sizeof(key), "equipment.sensor2_z%d_ok", zn);
                 state_set(key, zones_[z].evap_sensor->is_healthy());
@@ -783,10 +786,18 @@ void EquipmentModule::apply_outputs() {
                 }
             }
             // Per-zone EEV valve
-            if (zones_[z].eev_driver && out_.compressor) {
-                zones_[z].eev_driver->set_value(zones_[z].eev_valve_pos / 100.0f);
-            } else if (zones_[z].eev_driver) {
-                zones_[z].eev_driver->set_value(0.0f);  // Close when compressor OFF
+            if (zones_[z].eev_driver) {
+                // Emergency close (subcooled SH < 0) — zone-aware
+                char ec_key[48];
+                snprintf(ec_key, sizeof(ec_key), "%s.req.emergency_close", zones_[z].eev_ns);
+                if (read_bool(ec_key)) {
+                    zones_[z].eev_driver->emergency_stop();
+                    state_set(ec_key, false);  // ACK
+                } else if (out_.compressor) {
+                    zones_[z].eev_driver->set_value(zones_[z].eev_valve_pos / 100.0f);
+                } else {
+                    zones_[z].eev_driver->set_value(0.0f);  // Close when compressor OFF
+                }
             }
         }
     } else {
@@ -795,15 +806,17 @@ void EquipmentModule::apply_outputs() {
         if (evap_fan_)      evap_fan_->set(out_.evap_fan);
     }
 
-    // Block H: EEV valve output — apply to IValveDriver if bound (single-zone)
+    // Block H: EEV valve output — legacy single-zone path (role "eev" without suffix)
+    // У zone-aware конфігураціях eev_driver_ = nullptr (role = eev_z1/z2),
+    // emergency_close обробляється в per-zone path вище.
     if (eev_driver_) {
-        // Emergency close request from EEV module (subcooled SH < 0)
-        // Uses emergency_stop() → IValveDriver::emergency_close() at 150Hz
-        if (read_input_bool("eev.req.emergency_close")) {
+        char ec_key[48];
+        snprintf(ec_key, sizeof(ec_key), "%s.req.emergency_close", zones_[0].eev_ns);
+        if (read_bool(ec_key)) {
             eev_driver_->emergency_stop();
-            state_set("eev.req.emergency_close", false);  // ACK — одноразовий прапорець
+            state_set(ec_key, false);
         } else {
-            eev_driver_->set_value(out_.valve_pos / 100.0f);  // 0-100% → 0.0-1.0
+            eev_driver_->set_value(out_.valve_pos / 100.0f);
         }
     }
 }

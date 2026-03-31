@@ -169,8 +169,11 @@ static constexpr modesp::InputBinding z1_eev_inputs[] = {
     {"equipment.evap_temp",    "equipment.evap_temp_z1"},
     {"equipment.suction_bar",  "equipment.suction_bar_z1"},
     {"equipment.has_suction_p","equipment.has_suction_p_z1"},
+    {"equipment.sensor2_ok",   "equipment.sensor2_ok"},
     {"equipment.refrigerant",  "equipment.refrigerant"},
     {"defrost.active",         "defrost_z1.active"},
+    {"thermostat.temperature", "thermo_z1.temperature"},
+    {"thermostat.effective_setpoint", "thermo_z1.effective_setpoint"},
 };
 
 // ── Zone 2 InputBindings (includes zone_enabled check) ──
@@ -199,8 +202,11 @@ static constexpr modesp::InputBinding z2_eev_inputs[] = {
     {"equipment.evap_temp",    "equipment.evap_temp_z2"},
     {"equipment.suction_bar",  "equipment.suction_bar_z2"},
     {"equipment.has_suction_p","equipment.has_suction_p_z2"},
+    {"equipment.sensor2_ok",   "equipment.sensor2_z2_ok"},
     {"equipment.refrigerant",  "equipment.refrigerant"},
     {"defrost.active",         "defrost_z2.active"},
+    {"thermostat.temperature", "thermo_z2.temperature"},
+    {"thermostat.effective_setpoint", "thermo_z2.effective_setpoint"},
 };
 
 // Zone 1 — always active
