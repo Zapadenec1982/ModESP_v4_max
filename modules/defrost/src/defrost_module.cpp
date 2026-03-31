@@ -459,6 +459,21 @@ void DefrostModule::start_defrost(const char* reason) {
         active_defrost_type_ = 0;
     }
 
+    // Multi-zone: natural defrost (type=0) зупиняє shared компресор →
+    // охолодження ВСІХ зон припиняється. В 2+ зонних системах це неприпустимо.
+    // Fallback: electric (type=1) якщо є реле, інакше skip defrost.
+    int32_t active_zones = read_int("equipment.active_zones", 1);
+    if (active_defrost_type_ == 0 && active_zones >= 2) {
+        if (read_input_bool("equipment.has_defrost_relay")) {
+            ESP_LOGW(TAG, "Multi-zone: natural defrost blocked — fallback to ELECTRIC");
+            active_defrost_type_ = 1;
+        } else {
+            ESP_LOGW(TAG, "Multi-zone: natural defrost blocked, no relay — skipping");
+            interval_timer_ms_ = 0;
+            return;
+        }
+    }
+
     // Power Defrost: підсилений дефрост вночі (MPXPRO ddt/ddP)
     bool night_active = read_input_bool("thermostat.night_active");
     float effective_end_temp = end_temp_;
