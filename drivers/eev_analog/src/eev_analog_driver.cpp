@@ -24,6 +24,15 @@ bool EevAnalogDriver::init() {
         return false;
     }
 
+    // Init DAC handle once (zero-heap: не створюємо/знищуємо кожен write)
+    dac_channel_t channel = (dac_gpio_ == 25) ? DAC_CHAN_0 : DAC_CHAN_1;
+    dac_oneshot_config_t cfg = { .chan_id = channel };
+    esp_err_t err = dac_oneshot_new_channel(&cfg, &dac_handle_);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "[%s] DAC init failed: %s", role_, esp_err_to_name(err));
+        return false;
+    }
+
     // Set initial position to 0 (closed)
     write_dac(0);
     position_ = 0;
@@ -59,17 +68,8 @@ void EevAnalogDriver::emergency_close() {
 }
 
 void EevAnalogDriver::write_dac(uint8_t value) {
-    // ESP32 DAC: GPIO25 = DAC_CHAN_0, GPIO26 = DAC_CHAN_1
-    dac_channel_t channel = (dac_gpio_ == 25) ? DAC_CHAN_0 : DAC_CHAN_1;
-
-    // Use legacy DAC API (simpler, no handle management)
-    // ESP-IDF v5.x still supports dac_output_voltage()
-    dac_oneshot_handle_t handle = nullptr;
-    dac_oneshot_config_t cfg = { .chan_id = channel };
-    esp_err_t err = dac_oneshot_new_channel(&cfg, &handle);
-    if (err == ESP_OK && handle) {
-        dac_oneshot_output_voltage(handle, value);
-        dac_oneshot_del_channel(handle);
+    if (dac_handle_) {
+        dac_oneshot_output_voltage(dac_handle_, value);
     }
 }
 

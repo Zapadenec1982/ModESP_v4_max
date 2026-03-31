@@ -32,7 +32,9 @@ public:
     /// Configure after pool allocation (used by DriverManager)
     void configure(const char* role, int gpio, uint32_t cycle_ms = 6000,
                    uint8_t min_duty_pct = 10) {
-        role_ = role; gpio_ = gpio; cycle_ms_ = cycle_ms; min_duty_pct_ = min_duty_pct;
+        role_ = role; gpio_ = gpio;
+        cycle_ms_ = cycle_ms > 0 ? cycle_ms : 6000;
+        min_duty_pct_ = min_duty_pct;
     }
 
     // ── IValveDriver ──

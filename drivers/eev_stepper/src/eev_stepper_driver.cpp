@@ -107,7 +107,18 @@ void EevStepperDriver::update(uint32_t dt_ms) {
     }
 
     // Normal operation — move towards target
-    if (current_pos_ == target_pos_) return;
+    if (current_pos_ == target_pos_) {
+        // NVS debounce: зберігаємо тільки якщо позиція стабільна 60с
+        // Запобігає зносу flash при частих PI updates (кожні 3с)
+        if (nvs_dirty_) {
+            nvs_stable_ms_ += dt_us / 1000;
+            if (nvs_stable_ms_ >= NVS_DEBOUNCE_MS) {
+                save_position_nvs();
+                nvs_dirty_ = false;
+            }
+        }
+        return;
+    }
 
     uint32_t interval = emergency_mode_ ? emergency_interval_us_ : step_interval_us_;
     step_timer_us_ += dt_us;
@@ -123,10 +134,11 @@ void EevStepperDriver::update(uint32_t dt_ms) {
         step_timer_us_ -= interval;
     }
 
-    // Save position when target reached
+    // Target reached — mark dirty, start debounce timer
     if (current_pos_ == target_pos_) {
         emergency_mode_ = false;
-        save_position_nvs();
+        nvs_dirty_ = true;
+        nvs_stable_ms_ = 0;
     }
 }
 

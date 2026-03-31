@@ -84,6 +84,11 @@ private:
     HomingState homing_state_ = HomingState::IDLE;
     uint16_t    homing_steps_remaining_ = 0;
 
+    // NVS debounce — save only when position stable for 60s
+    static constexpr uint32_t NVS_DEBOUNCE_MS = 60000;
+    bool     nvs_dirty_ = false;
+    uint32_t nvs_stable_ms_ = 0;
+
     void step_one(bool dir_open);
     void set_enable(bool enabled);
     void save_position_nvs();

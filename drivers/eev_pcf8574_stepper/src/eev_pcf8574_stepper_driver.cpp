@@ -76,7 +76,7 @@ void EevPcf8574StepperDriver::update(uint32_t dt_ms) {
 
             if (homing_remaining_ > 0) {
                 set_dir(false);  // Close direction
-                do_step();
+                if (!do_step()) return;  // I2C failed — retry next cycle
                 homing_remaining_--;
             } else {
                 // Homing complete
@@ -92,7 +92,17 @@ void EevPcf8574StepperDriver::update(uint32_t dt_ms) {
     }
 
     // ── Normal operation — move towards target ──
-    if (current_pos_ == target_pos_) return;
+    if (current_pos_ == target_pos_) {
+        // NVS debounce: зберігаємо тільки якщо позиція стабільна 60с
+        if (nvs_dirty_) {
+            nvs_stable_ms_ += dt_ms;
+            if (nvs_stable_ms_ >= NVS_DEBOUNCE_MS) {
+                save_position();
+                nvs_dirty_ = false;
+            }
+        }
+        return;
+    }
 
     step_timer_ms_ += dt_ms;
     uint32_t interval = emergency_ ? EMERGENCY_INTERVAL_MS : STEP_INTERVAL_MS;
@@ -102,7 +112,7 @@ void EevPcf8574StepperDriver::update(uint32_t dt_ms) {
 
         bool opening = target_pos_ > current_pos_;
         set_dir(opening);
-        do_step();
+        if (!do_step()) return;  // I2C failed — retry next cycle
 
         if (opening) {
             current_pos_++;
@@ -110,10 +120,11 @@ void EevPcf8574StepperDriver::update(uint32_t dt_ms) {
             if (current_pos_ > 0) current_pos_--;
         }
 
-        // Target reached
+        // Target reached — mark dirty, start debounce timer
         if (current_pos_ == target_pos_) {
             emergency_ = false;
-            save_position();
+            nvs_dirty_ = true;
+            nvs_stable_ms_ = 0;
         }
     }
 }
@@ -151,17 +162,20 @@ void EevPcf8574StepperDriver::emergency_close() {
     ESP_LOGW(TAG, "[%s] Emergency close — fast mode", role_.c_str());
 }
 
-void EevPcf8574StepperDriver::do_step() {
+bool EevPcf8574StepperDriver::do_step() {
     // STEP HIGH
     expander_->output_state |= (1 << step_pin_);
-    expander_->write_state();
+    if (!expander_->write_state()) {
+        ESP_LOGW(TAG, "[%s] I2C STEP write failed", role_.c_str());
+        return;  // Не інкрементуємо position — крок не виконано
+    }
 
-    // Brief delay — PCF8574 I2C write takes ~0.3ms, that's enough pulse width
-    // No explicit delay needed between two I2C transactions
-
-    // STEP LOW
+    // STEP LOW (I2C write ~0.3ms = достатня ширина імпульсу)
     expander_->output_state &= ~(1 << step_pin_);
-    expander_->write_state();
+    if (!expander_->write_state()) {
+        ESP_LOGW(TAG, "[%s] I2C STEP LOW write failed", role_.c_str());
+    }
+    return true;
 }
 
 void EevPcf8574StepperDriver::set_dir(bool open_direction) {

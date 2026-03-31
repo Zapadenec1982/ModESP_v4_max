@@ -32,7 +32,7 @@ public:
     void configure(const char* role, int dac_gpio, uint16_t max_steps = 255) {
         role_ = role;
         dac_gpio_ = dac_gpio;
-        max_steps_ = max_steps;
+        max_steps_ = max_steps > 0 ? max_steps : 255;
     }
 
     // ── IValveDriver ──
@@ -56,6 +56,10 @@ private:
     uint16_t    max_steps_;
     uint16_t    position_ = 0;
     bool        initialized_ = false;
+
+#ifndef HOST_BUILD
+    dac_oneshot_handle_t dac_handle_ = nullptr;
+#endif
 
     /// Write DAC value (0-255) to GPIO
     void write_dac(uint8_t value);

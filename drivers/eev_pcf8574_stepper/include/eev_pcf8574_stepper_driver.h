@@ -80,8 +80,13 @@ private:
     HomingState homing_state_ = HomingState::IDLE;
     uint16_t   homing_remaining_ = 0;
 
-    /// Generate one step pulse via PCF8574
-    void do_step();
+    // NVS debounce — save only when position stable for 60s
+    static constexpr uint32_t NVS_DEBOUNCE_MS = 60000;
+    bool     nvs_dirty_ = false;
+    uint32_t nvs_stable_ms_ = 0;
+
+    /// Generate one step pulse via PCF8574. Returns false on I2C failure.
+    bool do_step();
 
     /// Set DIR pin on PCF8574
     void set_dir(bool open_direction);
