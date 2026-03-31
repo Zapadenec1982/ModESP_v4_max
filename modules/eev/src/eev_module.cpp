@@ -392,9 +392,12 @@ void EevModule::on_update(uint32_t dt_ms) {
                 ESP_LOGW(TAG, "SUBCOOLED — emergency valve close!");
             }
 
-            // Exit when superheat recovers above target
-            if (superheat_ > sh_target_) {
-                ESP_LOGI(TAG, "Superheat recovered: %.1fK > %.1fK", superheat_, sh_target_);
+            // Exit when superheat recovers above target + hysteresis (Danfoss EKE practice).
+            // Запобігає осциляції RUNNING ↔ LOW_SH_PROTECT при SH ~ sh_target.
+            constexpr float LOW_SH_RECOVERY_OFFSET = 2.0f;  // K
+            if (superheat_ > sh_target_ + LOW_SH_RECOVERY_OFFSET) {
+                ESP_LOGI(TAG, "Superheat recovered: %.1fK > %.1fK+%.0f",
+                         superheat_, sh_target_, LOW_SH_RECOVERY_OFFSET);
                 enter_state(State::RUNNING);
             }
             break;
