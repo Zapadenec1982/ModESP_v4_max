@@ -1,321 +1,920 @@
-# ModESP v4 — Industrial Refrigeration Controller
+# ModESP v4 — Project Guide for Claude Code
 
-## Overview
+**Version:** 1.0  
+**Updated:** 2026-03-31  
+**Project:** Industrial ESP32 refrigeration controller (replaces Danfoss/Dixell with open firmware)
 
-Modular ESP32 firmware framework for commercial/industrial refrigeration control.
-Replaces proprietary Danfoss/Dixell PLCs with an open-source ESP32 platform.
-Manages compressor cycling, defrost sequences, EEV control, alarm monitoring, and data logging.
+---
 
-## Quick Reference
+## Quick Identity
 
-```bash
-# Build firmware (ESP-IDF)
-idf.py build
+| Attribute | Value |
+|-----------|-------|
+| **Domain** | Industrial refrigeration control (cold rooms, freezers, display cases) |
+| **Target MCU** | ESP32-WROOM-32 (4 MB flash, dual-core 240 MHz) |
+| **Framework** | ESP-IDF v5.5, FreeRTOS, C++17 |
+| **Architecture** | Manifest-driven (JSON → Python generator → UI + C++ headers) |
+| **Status** | Production release v1.0.1 (verified on KC868-A6 + real equipment) |
+| **Code Comments** | Ukrainian; Doxygen headers in English |
+| **Build** | CMake + ESP-IDF, PowerShell script on Windows |
+| **Tests** | 491 total: 310 pytest (Python) + 181 doctest (C++ host) |
 
-# Flash + monitor
-idf.py -p /dev/ttyUSB0 flash monitor
+---
 
-# WebUI build + deploy
-cd webui && npm run build && npm run deploy
+## What This Project Does
 
-# Run Python generator (auto-runs at build)
-python tools/generate_ui.py --project project.json --modules-dir modules --output-data data --output-gen generated
+ModESP is a complete firmware framework for commercial refrigeration controllers. It replaces expensive proprietary controllers ($200–500) with a $4 ESP32 microcontroller while maintaining industrial reliability.
 
-# Run pytest (generator/manifest tests)
-cd tools && python -m pytest tests/ -v
+**Key capabilities:**
+- Temperature control via thermostat (4-state FSM with asymmetric differential)
+- 7-phase defrost FSM (natural, electric, hot-gas heating)
+- 10 independent alarm monitors with 2-level escalation
+- MQTT with TLS + Home Assistant Auto-Discovery
+- Embedded Svelte 4 WebUI (83 KB gzipped, 4 languages, dark/light theme)
+- DataLogger: 6-channel temperature + 18 event types, LittleFS storage
+- Multi-zone support (2+ temperature zones)
+- Electronic expansion valve (EEV) control with PI algorithm
+- Modbus RTU slave for legacy integrations
+- Over-the-air firmware updates with rollback
 
-# Host C++ tests (doctest)
-cd tests/host && mkdir -p build && cd build && cmake .. && make && ./modesp_tests
+**Hardware abstraction:** Same firmware binary runs on different boards (dev PCB vs KC868-A6) by swapping `board.json` and `bindings.json` files.
 
-# Rollback .rules/ if agent degradation
-git checkout HEAD~1 -- .rules/
+---
+
+## System Architecture
+
+```
+                    ┌──────────────────────────────────────────────┐
+                    │              ESP32 (FreeRTOS)                │
+                    │                                              │
+  ┌──────────┐     │  ┌──────────┐  ┌───────────┐  ┌──────────┐  │
+  │ DS18B20  │◄───►│  │Equipment │  │Thermostat │  │ Defrost  │  │
+  │ NTC      │     │  │ Manager  │  │  4-state  │  │ 7-phase  │  │
+  │ ADC      │     │  │  (HAL)   │  │   FSM     │  │   FSM    │  │
+  └──────────┘     │  └────┬─────┘  └─────┬─────┘  └────┬─────┘  │
+                   │       │              │              │        │
+  ┌──────────┐     │  ┌────▼──────────────▼──────────────▼────┐   │
+  │  Relay   │◄───►│  │         SharedState (231 keys)       │   │
+  │  PCF8574 │     │  │  etl::unordered_map, thread-safe     │   │
+  │  GPIO    │     │  └────┬──────────┬──────────┬────────────┘   │
+  └──────────┘     │       │          │          │                │
+                   │  ┌────▼────┐ ┌───▼────┐ ┌──▼──────┐       │
+                   │  │Protection│ │DataLog │ │Lighting │  ...  │
+                   │  │10 alarms │ │6-ch    │ │Schedules│       │
+                   │  └─────────┘ └────────┘ └─────────┘       │
+                   │                                              │
+                   │  ┌──────────────────────────────────────┐    │
+                   │  │          Services Layer               │    │
+                   │  │ WiFi · MQTT · HTTP · WebSocket · OTA │    │
+                   │  └───────┬──────────┬───────────┬───────┘    │
+                   └──────────┼──────────┼───────────┼────────────┘
+                              │          │           │
+                         ┌────▼───┐ ┌────▼────┐ ┌───▼────────┐
+                         │  MQTT  │ │ Browser │ │ ModESP     │
+                         │ Broker │ │ (WebUI) │ │ Cloud /    │
+                         │ (TLS)  │ │ Svelte  │ │ AWS IoT    │
+                         └────────┘ └─────────┘ └────────────┘
 ```
 
-## Tech Stack
+### Core Components
 
-| Layer | Technology |
-|-------|-----------|
-| MCU | ESP32-WROOM-32 (Xtensa dual-core 240 MHz, 4 MB flash) |
-| Framework | ESP-IDF v5.5, C++17 |
-| Containers | ETL (Embedded Template Library) — zero-heap |
-| Board | Kincony KC868-A6 (6 relays, 6 inputs via I2C PCF8574) |
-| Web UI | Svelte 4, Rollup, dark/light theme, 4 languages (UK/EN/DE/PL) |
-| Connectivity | WiFi STA/AP, HTTP REST (21 endpoints), WebSocket, MQTT+TLS, Modbus RTU |
-| Tests | doctest (C++ host, 108 tests), pytest (Python, 310 tests) |
-| Build | CMake (ESP-IDF), Python 3 code generator |
+**SharedState**
+- Central key-value store: `etl::unordered_map<StateKey, StateValue, 158>`
+- Thread-safe with FreeRTOS mutex
+- No heap allocation (fixed capacity at compile time)
+- Versioned for WebSocket delta broadcasts
 
-## Project Structure
+**Equipment Manager** (Priority = CRITICAL)
+- Only module with direct HAL access
+- Reads sensors via drivers
+- Arbitrates requests from Thermostat/Defrost/Protection
+- Applies outputs to relays
+- Enforces interlocks (e.g., defrost relay ↔ compressor never both ON)
+
+**Business Modules**
+- Thermostat (Priority = NORMAL): 4-state FSM, night setback, safety run
+- Defrost (Priority = NORMAL): 7-phase FSM, 3 types, 4 initiation modes
+- Protection (Priority = HIGH): 10 independent alarm monitors, CompressorTracker
+- DataLogger (Priority = LOW): 6-channel recorder, LittleFS, streaming API
+- EEV (Priority = NORMAL): PI algorithm, stepper/analog/PCF8574 control, 23 refrigerants
+- Lighting (Priority = LOW): Schedule-based control
+- Equipment: as above
+
+**Drivers** (11 types)
+- **Sensors:** DS18B20 (OneWire), NTC (ADC thermistor), pressure ADC
+- **Actuators:** Relay (GPIO), PCF8574 relay/input (I2C), EEV (analog, stepper, PCF8574+stepper, AKV pulse)
+- **Inputs:** Digital input (debounced)
+
+---
+
+## Project Structure (Detailed)
 
 ```
 ModESP_v4_max/
-├── main/main.cpp              # Boot sequence (3-phase init), main loop
-├── components/                # ESP-IDF components (core framework)
-│   ├── modesp_core/           #   BaseModule, ModuleManager, SharedState, types
-│   ├── modesp_services/       #   PersistService, ErrorService, WatchdogService, Config, NVS
-│   ├── modesp_hal/            #   HAL abstraction, DriverManager
-│   ├── modesp_net/            #   WiFiService, HttpService (21 endpoints), WsService
-│   ├── modesp_mqtt/           #   MQTT client (TLS, HA Auto-Discovery)
-│   ├── modesp_modbus/         #   Modbus RTU slave (284 input + 252 holding registers)
-│   ├── modesp_modbus_master/  #   Modbus RTU master
-│   ├── modesp_refrigerant/    #   23 refrigerants, Antoine equation, dew/bubble point
-│   ├── modesp_aws/            #   AWS IoT Core (mTLS, Shadow, Jobs OTA)
-│   ├── modesp_json/           #   JSON serialization helpers
-│   └── jsmn/                  #   Lightweight JSON parser (header-only)
-├── drivers/                   # HAL drivers (11 drivers)
-│   ├── ds18b20/               #   OneWire temperature (MATCH_ROM, SEARCH_ROM)
-│   ├── ntc/                   #   ADC thermistor (B-parameter)
-│   ├── pressure_adc/          #   Ratiometric ADC (Carel SPKT 0.5-4.5V)
-│   ├── digital_input/         #   GPIO input (50ms debounce)
-│   ├── pcf8574_input/         #   I2C PCF8574 digital input
-│   ├── relay/                 #   GPIO relay (min on/off time)
-│   ├── pcf8574_relay/         #   I2C PCF8574 relay
-│   ├── eev_stepper/           #   GPIO stepper (TMC2209/DRV8825/A4988)
-│   ├── eev_pcf8574_stepper/   #   I2C PCF8574 H-bridge stepper (L298N)
-│   ├── eev_analog/            #   DAC 0-10V via LM258 op-amp
-│   └── akv_pulse/             #   PWM solenoid (Danfoss AKV, Emerson EX2)
-├── modules/                   # Business modules (7 modules)
-│   ├── equipment/             #   HAL owner, sensor reads, relay arbitration (P=0)
-│   ├── protection/            #   10 alarm monitors, lockout/blocking (P=1)
-│   ├── thermostat/            #   Temperature control, differential, night setback (P=2)
-│   ├── defrost/               #   7-phase defrost FSM, 3 types (P=2)
-│   ├── eev/                   #   Electronic expansion valve, PI controller (P=2)
-│   ├── lighting/              #   Lighting control, 3 modes (P=2)
-│   └── datalogger/            #   6-channel data recorder, LittleFS (P=3)
-├── webui/                     # Svelte 4 SPA source
-│   ├── src/                   #   Components, stores, i18n
-│   └── rollup.config.js       #   Build config
-├── tools/
-│   ├── generate_ui.py         #   Manifest -> artifacts generator (~1700 lines)
-│   └── tests/                 #   310 pytest tests + fixtures
-├── tests/host/                # 108 doctest C++ test cases
+├── README.md                  # Feature list + metrics
+├── ARCHITECTURE.md            # System deep-dive
+├── CMakeLists.txt            # ESP-IDF root (auto-detects board from sdkconfig)
+├── project.json              # Active modules list + zone config
+├── sdkconfig.defaults        # ESP-IDF defaults (WiFi, OTA, etc.)
+├── partitions.csv            # Flash layout (dual OTA + LittleFS)
+│
+├── main/
+│   └── main.cpp              # Boot sequence (3-phase init) + main loop
+│
+├── components/               # ESP-IDF components (7)
+│   ├── modesp_core/          # BaseModule, ModuleManager, SharedState, types.h, message_types.h
+│   ├── modesp_services/      # ErrorService, LoggerService, ConfigService, PersistService, WatchdogService, NVS
+│   ├── modesp_hal/           # HAL, DriverManager, driver interfaces, message bus
+│   ├── modesp_net/           # WiFiService, HttpService, WsService (23 endpoints)
+│   ├── modesp_mqtt/          # MqttService (TLS, HA Discovery, delta-publish)
+│   ├── modesp_modbus/        # Modbus RTU slave (284 input, 252 holding registers)
+│   ├── modesp_refrigerant/   # 23 refrigerants, saturation props, dew point
+│   ├── modesp_json/          # JSON helpers
+│   └── jsmn/                 # Lightweight JSON parser
+│
+├── drivers/                  # Hardware drivers (11 types, each a component)
+│   ├── ds18b20/              # OneWire temperature (SEARCH_ROM, MATCH_ROM, CRC8)
+│   ├── ntc/                  # NTC thermistor (B-parameter, ADC)
+│   ├── relay/                # GPIO relay (min on/off time protection)
+│   ├── digital_input/        # GPIO input (50ms debounce)
+│   ├── pcf8574_relay/        # I2C expander relays (KC868-A6)
+│   ├── pcf8574_input/        # I2C expander inputs
+│   ├── pressure_adc/         # Pressure sensor (0-10V → bar)
+│   ├── eev_analog/           # EEV valve (analog 0-10V output)
+│   ├── eev_stepper/          # EEV valve (stepper motor)
+│   ├── eev_pcf8574_stepper/  # EEV valve (PCF8574 relay matrix for stepper)
+│   └── akv_pulse/            # AKV pulse counter (frequency to RPM)
+│
+├── modules/                  # Business modules (7, each a component)
+│   ├── equipment/            # HAL owner, arbitration, interlocks
+│   ├── thermostat/           # 4-state FSM, night setback, safety run
+│   ├── defrost/              # 7-phase FSM, 3 types, 4 initiations
+│   ├── protection/           # 10 alarm monitors, CompressorTracker
+│   ├── eev/                  # PI control loop, 23 refrigerants
+│   ├── lighting/             # Schedule-based relay control
+│   └── datalogger/           # 6-ch recorder, LittleFS, streaming API
+│
+├── boards/                   # Board configurations
+│   ├── dev/                  # ESP32-DevKit (GPIO relays)
+│   │   ├── board.json        # GPIO pin definitions
+│   │   └── bindings.json     # Role → driver mappings
+│   └── kc868a6/              # KC868-A6 (I2C PCF8574)
+│       ├── board.json
+│       └── bindings.json
+│
 ├── data/
-│   ├── board.json             #   Active board config (copied from boards/)
-│   ├── bindings.json          #   Active driver bindings (copied from boards/)
-│   ├── ui.json                #   GENERATED — do not edit
-│   ├── i18n/                  #   System i18n packs (en, de, pl + manifest)
-│   └── www/                   #   Deployed web assets (gzipped bundles)
-├── boards/
-│   ├── dev/                   #   Dev board (GPIO relays)
-│   └── kc868a6/               #   Production KC868-A6 (I2C expanders)
-├── generated/                 #   GENERATED C++ headers — do not edit
-├── docs/                      #   Architecture docs (01-12), changelog, features
-├── .rules/                    #   Agent rules and conventions (structured)
-├── project.json               #   Active module list + zone config
-├── partitions.csv             #   Flash layout: NVS 32K + OTA 2x1472K + LittleFS 960K
-├── sdkconfig.defaults         #   ESP-IDF defaults (board, flash, TLS optimization)
-├── CMakeLists.txt             #   Root build file (board selection, generator invocation)
-└── ARCHITECTURE.md            #   Full system architecture documentation
+│   ├── board.json            # GENERATED from boards/*/board.json (selected via sdkconfig)
+│   ├── bindings.json         # GENERATED from boards/*/bindings.json
+│   ├── ui.json               # GENERATED by generate_ui.py (manifest → UI schema)
+│   ├── i18n/                 # Language files (lazy-load from browser)
+│   └── www/                  # Deployed WebUI (gzipped bundles)
+│
+├── generated/                # GENERATED by generate_ui.py (do NOT edit)
+│   ├── state_meta.h          # State key metadata (read/write, type, range, persist)
+│   ├── mqtt_topics.h         # MQTT pub/sub topic arrays
+│   ├── display_screens.h     # LCD display menu (future)
+│   └── features_config.h     # Feature flags based on bindings
+│
+├── webui/                    # Svelte 4 source
+│   ├── src/
+│   │   ├── App.svelte        # Root component
+│   │   ├── pages/            # Dashboard, Settings, Logs, Network, System
+│   │   ├── components/       # Shared widgets (GaugeCard, SettingGroup, etc.)
+│   │   ├── i18n/             # Translation keys
+│   │   ├── api.ts            # HTTP/WS client
+│   │   └── store.ts          # Svelte store (state, UI config)
+│   ├── package.json
+│   ├── rollup.config.js
+│   └── public/               # Static assets
+│
+├── tools/
+│   ├── generate_ui.py        # Manifest → UI + C++ headers (~1700 lines)
+│   └── tests/                # 310 pytest test cases
+│       ├── conftest.py
+│       ├── test_generator.py
+│       ├── test_features.py
+│       ├── test_modules.py
+│       ├── test_hil.py       # Hardware-in-the-loop simulation
+│       └── ... (8 test files total)
+│
+├── tests/
+│   └── host/                 # 108 doctest C++ test cases (run on desktop)
+│       ├── CMakeLists.txt
+│       ├── test_shared_state.cpp
+│       ├── test_thermostat.cpp
+│       ├── test_defrost.cpp
+│       ├── test_protection.cpp
+│       └── ...
+│
+├── docs/
+│   ├── FEATURES.md           # Complete feature matrix
+│   ├── FEATURES_UA.md        # Ukrainian translation
+│   ├── 05_cooling_defrost.md # Thermostat + Defrost specification
+│   ├── 07_equipment.md       # Equipment Manager + Protection
+│   ├── 10_manifest_standard.md
+│   └── ... (schema docs)
+│
+├── .rules/                   # Agent team rules (7 roles, permissions, patterns)
+│   ├── _index.md             # Identity, permissions summary
+│   ├── core/
+│   │   ├── constraints.md    # Zero heap, ETL, style, SSoT
+│   │   ├── architecture.md   # System overview
+│   │   └── permissions.md    # 3-tier access control
+│   ├── context/
+│   │   ├── roles.md          # 7 agent roles (Firmware Dev, WebUI Dev, etc.)
+│   │   ├── references.md     # API endpoints, state keys, structure
+│   │   └── memory.md         # Decisions, errors (cross-session tracking)
+│   └── generation/
+│       ├── patterns.md       # Code patterns with examples
+│       └── output.md         # Commit convention, docs rules
+│
+├── .github/
+│   └── copilot-instructions.md  # GitHub Copilot adapter
+│
+├── AGENTS.md                 # Universal hub for all agents
+├── CLAUDE.md                 # THIS FILE (project guide)
+├── LICENSE                   # PolyForm Noncommercial 1.0.0
+└── .gitignore               # Excludes build/, generated/, secrets, etc.
 ```
 
-## Architecture Overview
+---
 
-### Core Pattern: SharedState Hub
+## Key Design Decisions
 
-All inter-module communication flows through SharedState (126 keys, versioned, thread-safe).
-Modules never call each other directly — they read/write state keys.
+### 1. Manifest-Driven Architecture (Single Source of Truth)
 
-```
-Equipment(P=0) → reads sensors, publishes temperatures, arbitrates relay outputs
-Protection(P=1) → monitors 10 alarms, sets lockout/compressor_blocked
-Thermostat(P=2) → cooling state machine, writes thermostat.req.compressor
-Defrost(P=2) → 7-phase FSM, writes defrost.req.*
-EEV(P=2) → PI controller, writes eev.req.position
-DataLogger(P=3) → records 6 channels to LittleFS
-```
-
-### Arbitration Priority (Equipment enforces)
+All module capabilities are declared in JSON manifests:
 
 ```
-LOCKOUT (permanent) > COMPRESSOR_BLOCKED (temporary) > DEFROST > THERMOSTAT
+module/*/manifest.json ─┐
+driver/*/manifest.json ─┼→ generate_ui.py ──→ ui.json
+board.json             ─┤                    state_meta.h
+bindings.json          ─┘                    mqtt_topics.h
+                                             features_config.h
 ```
 
-**Critical interlock:** defrost_relay + compressor are NEVER active simultaneously.
+**Why:** Change a manifest, rebuild, and the UI, state metadata, MQTT topics, and feature flags all update consistently. Zero manual sync.
 
-### Manifest-Driven Code Generation
+### 2. Hardware Abstraction via Board Config
+
+Same firmware binary on different hardware:
 
 ```
-modules/*/manifest.json ──┐
-drivers/*/manifest.json ──┼──► generate_ui.py ──► 5 artifacts:
-boards/*/board.json ──────┤     ├── data/ui.json            (UI schema)
-boards/*/bindings.json ───┘     ├── generated/state_meta.h   (constexpr metadata)
-                                ├── generated/mqtt_topics.h   (pub/sub topics)
-                                ├── generated/display_screens.h
-                                └── generated/features_config.h
+board.json      → GPIO pin assignments (relay_1 = GPIO 14, etc.)
+bindings.json   → Role mappings (role "compressor" → driver "relay" → GPIO "relay_1")
 ```
 
-Change the manifest, rebuild — UI, state metadata, MQTT topics all update automatically.
+Switch `boards/dev/` to `boards/kc868a6/`, rebuild, same binary runs on I2C expanders.
 
-### Three-Phase Boot (main.cpp)
+### 3. Equipment Manager as HAL Gatekeeper
 
-1. System services (Error, Watchdog, Logger, Config, Persist) → `init_all()`
-2. WiFi + HAL + Equipment + business modules → `init_all()`
-3. HTTP + WebSocket + MQTT → `init_all()`
+**No other module touches drivers directly.** Business modules (thermostat, defrost) publish *requests* to SharedState; Equipment arbitrates and applies outputs.
 
-`init_all()` is idempotent — skips modules already initialized.
+```
+Protection.lockout ──┐
+Defrost.req.*    ────┼→ Equipment arbitrator → apply_outputs() → drivers
+Thermostat.req.* ────┘
+```
 
-### Multi-Zone Support
+**Why:** Safety by architecture. A bug in thermostat cannot cause a short-cycle—the interlocks are structural.
 
-1-2 independent zones with per-zone instances of Thermostat, Defrost, EEV, Protection.
-Zone modules use `InputBindings` for automatic state key remapping (e.g., `equipment.air_temp` → `equipment.air_temp_z2`).
+### 4. Zero Heap Allocation in Hot Path
 
-## Code Conventions
+All control-loop code uses ETL (Embedded Template Library) containers with compile-time capacity bounds:
 
-### C++ Style
+| Replace | With | Capacity |
+|---------|------|----------|
+| `std::string` | `etl::string<32>` | 32 chars |
+| `std::vector` | `etl::vector<T, N>` | N elements |
+| `std::unordered_map` | `etl::unordered_map<K, V, N>` | N entries |
+
+**Why:** ESP32 has 320 KB RAM. Heap fragmentation in 24/7 industrial operation = crash.
+
+### 5. SharedState as Event Bus
+
+No direct module-to-module calls. All inter-module communication via a central key-value store:
 
 ```cpp
-// Every .cpp file MUST have:
+state_->set("thermostat.req.compressor", true);  // publish request
+// Equipment reads this, applies arbitration, publishes:
+state_->set("equipment.compressor", true);       // actual state
+```
+
+**Why:** Decoupling. Modules are isolated; can be tested independently.
+
+---
+
+## Module Architecture
+
+Every module extends `BaseModule`:
+
+```cpp
+class ThermostatModule : public BaseModule {
+    bool on_init() override;           // Called once at startup
+    void on_update(uint32_t dt_ms) override;  // Called every ~10ms
+    void on_message(const etl::imessage& msg) override;  // Message bus
+    void on_stop() override;           // Graceful shutdown
+};
+```
+
+### Module Update Cycle
+
+1. **Read** input from SharedState (sensor readings from Equipment)
+2. **Business logic** (FSM, control algorithm)
+3. **Write** request to SharedState (`thermostat.req.compressor`)
+4. Equipment reads requests, arbitrates, writes actual state
+
+### Update Priorities
+
+```
+CRITICAL(0) ─ Equipment (must read sensors first)
+HIGH(1)     ─ Protection (must alarm before thermostat acts)
+NORMAL(2)   ─ Thermostat, Defrost
+LOW(3)      ─ DataLogger, Lighting
+```
+
+Modules at same priority run in registration order.
+
+---
+
+## Code Style & Conventions
+
+### C++ / ESP-IDF Style
+
+**Mandatory:**
+
+```cpp
+// Every .cpp file
 static const char* TAG = "ModuleName";
 
-// Logging — always use ESP-IDF macros with TAG
-ESP_LOGI(TAG, "Setpoint: %.1f°C", setpoint);
-ESP_LOGW(TAG, "Sensor timeout");
-ESP_LOGE(TAG, "NVS write failed: %s", esp_err_to_name(err));
+// Logging (no printf)
+ESP_LOGI(TAG, "Thermostat started");
+ESP_LOGW(TAG, "Temperature rising at %.1f°C/min", rate);
+ESP_LOGE(TAG, "Sensor failure");
 
-// State access
-float temp = state_->get_or("equipment.air_temp", 0.0f);
-state_->set("thermostat.temperature", temp);
-state_->set("system.uptime", uptime, /*track_change=*/false);  // no WS broadcast
-
-// ETL containers only in hot path — NEVER std::string, std::vector, new, malloc
+// Zero heap — use ETL
 etl::string<32> key = "thermostat.setpoint";
-etl::vector<float, 8> readings;
+state_->set(key, 5.0f);
+
+// NOT: std::string key = "thermostat." + name;  // heap!
 ```
 
-### Zero Heap in Hot Path (CRITICAL)
+**Comments:**
+- Implementation details: Ukrainian
+- Doxygen headers (`@file`, `@brief`, `@param`): English
+- Build with `-Werror=all`: every warning = compile failure
 
-ESP32 has 320KB RAM. Heap fragmentation in 24/7 industrial operation causes crashes.
+### State Key Naming
 
-| NEVER in on_update()/on_message() | Use instead |
-|---|---|
-| `std::string`, `std::vector` | `etl::string<N>`, `etl::vector<T,N>` |
-| `new`, `malloc`, `std::make_shared` | Stack allocation, `etl::optional` |
-| `std::map`, `std::unordered_map` | `etl::unordered_map<K,V,N>` |
-| `printf`, `std::cout` | `ESP_LOGI/W/E/D(TAG, ...)` |
+```
+<module>.<key>
 
-### Module Pattern
+Examples:
+  equipment.air_temp          (float, °C)
+  equipment.compressor        (bool, actual relay state)
+  thermostat.req.compressor   (bool, requested state)
+  thermostat.setpoint         (float, °C)
+  thermostat.state            (int, enum: IDLE/COOLING/etc.)
+  protection.lockout          (bool, alarms active)
+  datalogger.temp_ch0         (float, last logged temperature)
+```
 
-All modules extend `BaseModule` with lifecycle methods:
+**Rules:**
+- Read-write int/float MUST have `min`, `max`, `step` in manifest
+- Float rounding: `roundf(T * 100) / 100` (limits version bumps)
+- Use `track_change=false` for diagnostics (timers, counters)
 
-```cpp
-class MyModule : public BaseModule {
-    void on_init() override;     // One-time setup
-    void on_update() override;   // Called every main loop iteration
-    void on_stop() override;     // Cleanup
-    void on_message(const etl::imessage& msg) override;  // Message bus handler
-};
+### Manifest Structure
 
-// on_update() pattern:
-void MyModule::on_update() {
-    // 1. Read inputs from SharedState
-    float air_temp = state_->get_or("equipment.air_temp", 0.0f);
-    // 2. Business logic
-    update_state_machine(air_temp);
-    // 3. Write requests (Equipment arbitrates)
-    state_->set("thermostat.req.compressor", compressor_request_);
-    // 4. Write status
-    state_->set("thermostat.state", static_cast<int32_t>(state_));
+```json
+{
+  "manifest_version": 1,
+  "module": "thermostat",
+  "description": "Temperature control with asymmetric differential",
+  
+  "requires": [
+    {"role": "air_temp", "type": "sensor", "driver": ["ds18b20", "ntc"]},
+    {"role": "compressor", "type": "actuator", "driver": ["relay", "pcf8574_relay"]}
+  ],
+  
+  "state": {
+    "thermostat.setpoint": {
+      "type": "float",
+      "access": "readwrite",
+      "persist": true,
+      "min": -30, "max": 10, "step": 0.1,
+      "unit": "°C"
+    },
+    "thermostat.state": {
+      "type": "int",
+      "access": "read",
+      "options": [
+        {"value": 0, "label": "IDLE"},
+        {"value": 1, "label": "COOLING"}
+      ]
+    }
+  }
 }
 ```
 
-**Only Equipment accesses HAL drivers.** Business modules write requests to SharedState.
+### Driver Interface Pattern
 
-### State Keys
+```cpp
+class ISensorDriver {
+public:
+    virtual ~ISensorDriver() = default;
+    virtual bool init() = 0;
+    virtual void update(uint32_t dt_ms) = 0;
+    virtual bool read(float& value) = 0;
+    virtual bool is_healthy() const = 0;
+    virtual const char* role() const = 0;
+    virtual const char* type() const = 0;
+    virtual uint32_t error_count() const = 0;
+};
 
-- Format: `<module>.<key>` (e.g., `thermostat.setpoint`, `equipment.air_temp`)
-- Read-write float/int keys MUST have `min`, `max`, `step` (or `options` for enums)
-- Persisted keys use DJB2 hash in NVS: `"s" + 7 hex chars`
+// Implement in driver:
+bool DS18B20Driver::read(float& value) override {
+    // Read latest temperature from cache (populated by update())
+    if (!is_healthy()) return false;
+    value = latest_temp_;
+    return true;
+}
+```
 
-### Comments & Language
+---
 
-- **Code comments:** Ukrainian
-- **Doxygen headers:** English
-- **Commit messages:** `feat(module):` / `fix(module):` prefix in English, body in Ukrainian
-- **UI text:** 4 languages (UK/EN/DE/PL) via i18n JSON files
+## Build System
 
-### Git Convention
+**Prerequisites:** ESP-IDF v5.5, Python 3.8+, Node.js 18+ (for WebUI)
+
+### Build Firmware
+
+```bash
+# Windows PowerShell
+powershell -ExecutionPolicy Bypass -File run_build.ps1
+
+# OR manually:
+idf.py build
+
+# Select board via menuconfig
+idf.py menuconfig
+# → Config → ModESP → Board selection: dev / kc868a6
+
+# Flash + monitor
+idf.py -p COM15 flash monitor
+```
+
+### WebUI Build (optional — pre-built included)
+
+```bash
+cd webui
+npm install
+npm run build      # → dist/bundle.js
+npm run deploy     # → copy to data/www/
+```
+
+### Tests
+
+```bash
+# Pytest (manifests, generator, API)
+cd tools
+python -m pytest tests/ -v
+
+# C++ doctest (business logic on desktop)
+cd tests/host
+cmake -B build
+cmake --build build
+ctest --test-dir build --verbose
+```
+
+### Generator (automatic, runs at build)
+
+```bash
+# Manual run:
+python tools/generate_ui.py \
+    --project project.json \
+    --modules-dir modules \
+    --output-data data \
+    --output-gen generated
+```
+
+---
+
+## Debugging & Troubleshooting
+
+### Common Issues
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| "Board not found" | `board.json` missing in active board dir | Check `sdkconfig` `CONFIG_MODESP_BOARD_DIR` |
+| "State key not found" | Typo or key not in manifest | Add to module's `manifest.json`, rebuild |
+| "Heap corruption" | `std::string` in on_update() | Replace with `etl::string<N>` |
+| MQTT won't connect | TLS cert path wrong | Check modesp_mqtt.c `MQTT_BROKER_CERT_PEM` |
+| WebSocket drops | 3 client limit | Close extra browser tabs |
+| Firmware size > 1.5 MB | WebUI bundle too large | Check `webui/dist/bundle.js` size < 80 KB gzipped |
+
+### Logging
+
+Enable debug logging via `sdkconfig`:
+
+```bash
+idf.py menuconfig
+→ Logging → Default log verbosity → Debug (or higher)
+```
+
+Then:
+```bash
+idf.py monitor
+```
+
+Serial output includes timing info:
+```
+I (1234) Equipment: Compressor ON at 1234567 ms
+W (1235) Thermostat: Setpoint mismatch: 5.0 vs 4.9
+```
+
+### Memory Profiling
+
+Check free heap:
+```
+state_->get("system.heap_free")
+state_->get("system.heap_largest")
+```
+
+The system logs warnings if free heap < 16 KB.
+
+---
+
+## Testing Strategy
+
+### Unit Tests (Doctest, C++ host)
+
+Test business logic **without hardware** on desktop:
+
+```cpp
+// tests/host/test_thermostat.cpp
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include <doctest/doctest.h>
+
+TEST_CASE("Thermostat: cool when T > SP + diff") {
+    ThermostatModule thermo;
+    MockSharedState state;
+    thermo.set_state(&state);
+    
+    state.set("equipment.air_temp", 5.0f);     // T
+    state.set("thermostat.setpoint", 0.0f);    // SP
+    state.set("thermostat.differential", 2.0f); // diff
+    
+    thermo.on_update(100);  // 100 ms delta
+    
+    auto req = state.get("thermostat.req.compressor");
+    REQUIRE(etl::get<bool>(*req) == true);
+}
+```
+
+Run:
+```bash
+cd tests/host
+cmake -B build && cmake --build build && ctest --test-dir build
+```
+
+### Integration Tests (Pytest)
+
+Validate manifests, generator output, API contracts:
+
+```python
+# tools/tests/test_modules.py
+def test_thermostat_manifest_has_setpoint(module_manifests):
+    m = module_manifests["thermostat"]
+    assert "thermostat.setpoint" in m["state"]
+    assert m["state"]["thermostat.setpoint"]["access"] == "readwrite"
+    assert m["state"]["thermostat.setpoint"]["persist"] == True
+```
+
+Run:
+```bash
+cd tools
+python -m pytest tests/ -v
+```
+
+### Hardware-in-the-Loop (HIL)
+
+Simulate firmware logic against mock drivers:
+
+```python
+# tools/tests/test_hil.py
+def test_equipment_arbitration_protection_wins():
+    sim = SimulatedController()
+    sim.set_state("equipment.air_temp", 5.0)
+    sim.set_state("protection.lockout", True)  # lockout active
+    sim.set_state("thermostat.req.compressor", True)  # thermo wants comp
+    
+    sim.step(dt_ms=100)
+    
+    assert sim.get_relay("compressor") == False  # protection wins
+```
+
+---
+
+## Connectivity & Protocols
+
+### WiFi
+
+- **Mode:** STA (client) with AP fallback (`ModESP-XXXX`) after 3 failures
+- **AP→STA probe:** While in AP, periodically attempts STA with exponential backoff (30s–5min)
+- **STA watchdog:** Restarts WiFi if disconnected >10 min cumulative
+- **mDNS:** Hostname `modesp.local`
+
+### MQTT
+
+- **Broker:** Configurable (default: `modesp.com.ua`)
+- **Port:** 8883 (TLS) or 1883 (plain)
+- **Topic prefix:** `modesp/v1/{tenant}/{device_id}/`
+- **Features:**
+  - Home Assistant Auto-Discovery
+  - Last Will & Testament (LWT)
+  - Delta-publish cache (16 entries, only changed values)
+  - Alarm republish every 5 min with retain flag
+  - Heartbeat every 60s
+
+### HTTP / WebSocket
+
+- **HTTP:** 23 REST endpoints (state, settings, OTA, logs, WiFi, MQTT config, etc.)
+- **WebSocket:** Real-time delta broadcasts, 1500ms interval, 20s heartbeat PING
+- **Max clients:** 3 concurrent WebSocket connections
+- **Compression:** Full state gzipped to ~3.5 KB; delta ~200 bytes
+
+### AWS IoT Core (optional)
+
+If compiled with `-DCONFIG_MODESP_CLOUD_AWS`:
+- MQTT over TLS to AWS IoT broker
+- Certificate-based auth
+- Shadow sync (reported state)
+
+---
+
+## Firmware Partitions & Storage
 
 ```
-feat(thermostat): add night setback mode
-
-- Додано 4 режими нічного зсуву
-- Налаштування зберігаються в NVS
+Flash Layout (4 MB):
+  0x009000  NVS           16 KB    Settings (DJB2-hashed keys)
+  0x00D000  OTA Data       8 KB    Boot selector
+  0x00F000  PHY Init       4 KB    RF calibration
+  0x010000  OTA Slot 0   1.5 MB    Active firmware
+  0x190000  OTA Slot 1   1.5 MB    Update target (rollback)
+  0x310000  LittleFS    960 KB    WebUI + DataLogger
 ```
 
-Prefixes: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `chore`, `release`
+**Persistence:**
+- **NVS:** Readwrite state keys (cached at boot, dirty-flag debounce 5s)
+- **LittleFS:** WebUI gzipped bundles, DataLogger records (18KB RAM buffer flushed every 10 min)
 
-## Permissions
+---
 
-### Allowed — edit freely
+## Common Development Tasks
 
-- `components/*/src/`, `modules/*/src/`, `drivers/*/src/`, `main/`
-- `components/*/include/`, `modules/*/include/`, `drivers/*/include/`
-- `modules/*/manifest.json`, `drivers/*/manifest.json`
-- `webui/src/`, `data/i18n/`, `tools/`, `tests/`, `docs/`, `README.md`
-- `boards/`, `data/board.json`, `data/bindings.json`
+### Add a New State Key
 
-### Ask First — confirm before editing
+1. Edit module manifest (`modules/*/manifest.json`):
+```json
+"state": {
+  "thermostat.hysteresis": {
+    "type": "float",
+    "access": "readwrite",
+    "persist": true,
+    "min": 0.1, "max": 5.0, "step": 0.1,
+    "unit": "°C",
+    "default": 2.0
+  }
+}
+```
 
-- `.rules/`, `CLAUDE.md` — changes agent behavior globally
+2. Rebuild (generator auto-creates metadata):
+```bash
+idf.py build
+```
+
+3. In module code:
+```cpp
+float hysteresis = state_->get_or("thermostat.hysteresis", 2.0f);
+```
+
+4. UI automatically shows setting card with slider.
+
+### Add a New Driver
+
+1. Create driver component (`drivers/my_sensor/`):
+```
+drivers/my_sensor/
+  ├── CMakeLists.txt
+  ├── idf_component.yml
+  ├── include/
+  │   └── my_sensor.h
+  ├── src/
+  │   └── my_sensor.cpp
+  └── manifest.json
+```
+
+2. Implement `ISensorDriver` interface:
+```cpp
+class MySensor : public modesp::ISensorDriver {
+    bool init() override;
+    void update(uint32_t dt_ms) override;
+    bool read(float& value) override;
+    bool is_healthy() const override;
+    // ...
+};
+```
+
+3. Register in DriverManager (HAL):
+```cpp
+// In modesp_hal/src/driver_manager.cpp
+if (type == "my_sensor") {
+    driver = new MySensor();
+    // ...
+}
+```
+
+4. Add to manifest:
+```json
+{
+  "manifest_version": 1,
+  "driver": "my_sensor",
+  "provides": [
+    {"role": "my_input", "type": "sensor", "label": "My Sensor"}
+  ]
+}
+```
+
+5. Use in binding:
+```json
+{
+  "hardware": "my_gpio",
+  "driver": "my_sensor",
+  "role": "my_input",
+  "module": "equipment"
+}
+```
+
+### Add a WebUI Page
+
+1. Create Svelte page (`webui/src/pages/MyPage.svelte`):
+```svelte
+<script>
+  import { state } from "../store";
+</script>
+
+<div class="page">
+  <h1>My Page</h1>
+  <p>Temperature: {$state["equipment.air_temp"]?.toFixed(1)}°C</p>
+</div>
+
+<style>
+  .page {
+    padding: 1rem;
+  }
+</style>
+```
+
+2. Add route in `App.svelte`:
+```svelte
+<Router>
+  <Route path="/mypage" component={MyPage} />
+</Router>
+```
+
+3. Add i18n keys in `data/i18n/en.json`:
+```json
+{
+  "menu.mypage": "My Page",
+  "mypage.title": "My Page"
+}
+```
+
+4. Build:
+```bash
+cd webui
+npm run build && npm run deploy
+```
+
+---
+
+## Code Review Checklist
+
+Before committing, verify:
+
+- **Zero heap:** No `std::string`, `std::vector`, `new`, `malloc` in `on_update()` / `on_message()`
+- **Logging:** Every error/warning uses `ESP_LOG*()` with TAG, not `printf`
+- **Secrets:** No `.env`, API keys, tokens, certificates in code
+- **State keys:** Follow `module.key` naming; read-write int/float have `min`/`max`/`step`
+- **Thread-safe:** SharedState access through `state_->set()` / `get()`; not direct member access
+- **Tests:** New features have doctest (C++) or pytest (Python)
+- **Manifests:** Valid JSON, no typos in state key names
+- **Generated:** DO NOT commit `generated/`, `data/ui.json`, `data/www/bundle.*`
+- **Comments:** Implementation = Ukrainian, Doxygen = English
+
+---
+
+## Permissions & Boundaries
+
+### Allowed (Edit Freely)
+
+- `components/*/src/`, `components/*/include/`
+- `modules/*/src/`, `modules/*/include/`, `modules/*/manifest.json`
+- `drivers/*/src/`, `drivers/*/include/`, `drivers/*/manifest.json`
+- `main/`, `webui/src/`, `tools/`, `tests/`, `docs/`, `data/i18n/`
+- `data/board.json`, `data/bindings.json`, `boards/*/`
+
+### Ask First
+
+- `.rules/` — changes agent behavior globally
+- `CLAUDE.md` — changes project guide
 - `partitions.csv` — wrong partition = bricked device
-- Root `CMakeLists.txt` — breaks build for all components
-- `sdkconfig*`, `Kconfig.projbuild` — affects all modules
-- Deleting any file, creating new components/modules
-- Pushing to remote
+- Root `CMakeLists.txt` — affects entire build
+- Delete files — irreversible
+- Push to remote — shared state
 
-### Forbidden — NEVER do this
+### Forbidden
 
-- **Edit generated files:** `generated/`, `data/ui.json`, `data/www/bundle.*`
-- **Commit secrets:** passwords, API keys, tokens, certificates, `.env` files
-- **Direct HAL from business modules:** only Equipment touches drivers
-- **Heap allocation in hot path:** no `std::string`/`new`/`malloc` in `on_update()`/`on_message()`
+- Commit secrets (keys, passwords, certs, `.env`)
+- Edit `generated/` or `data/ui.json` (auto-generated, overwritten)
+- Edit `data/www/bundle.*` (built from `webui/` source)
+- Direct HAL access from non-Equipment modules
+- Heap allocation in hot path
 
-## Testing
+---
 
-### Host C++ Tests (doctest)
+## Resources & References
 
-```bash
-cd tests/host && mkdir -p build && cd build && cmake .. && make && ./modesp_tests
-```
+### Documentation
 
-108 test cases covering Thermostat, Defrost, Protection, Equipment, DataLogger business logic against mock SharedState and stub HAL.
+- **README.md** — Feature matrix + metrics
+- **ARCHITECTURE.md** — Deep-dive system design
+- **AGENTS.md** — Universal hub for all agents
+- **docs/FEATURES.md** — Complete feature list (English + Ukrainian)
+- **docs/05_cooling_defrost.md** — Thermostat + Defrost specification
+- **docs/07_equipment.md** — Equipment Manager + Protection
+- **docs/10_manifest_standard.md** — Manifest schema v2
+- **.rules/*** — Agent team rules (7 roles, patterns, permissions)
 
-### Python Generator Tests (pytest)
+### External
 
-```bash
-cd tools && python -m pytest tests/ -v
-```
+- **ESP-IDF docs:** https://docs.espressif.com/projects/esp-idf/en/v5.5/
+- **ETL (Embedded Template Library):** https://www.etlcpp.com/
+- **Svelte 4:** https://svelte.dev/
+- **FreeRTOS:** https://www.freertos.org/
 
-310 test cases covering manifest parsing, feature resolution, constraint propagation, UI schema generation, and 7 validation passes.
+### Key Files to Know
 
-### Build Verification
+| Task | Read These |
+|------|-----------|
+| Understand architecture | `ARCHITECTURE.md`, `components/modesp_core/include/modesp/app.h` |
+| Add C++ code | `.rules/generation/patterns.md`, existing module (e.g., `modules/thermostat/`) |
+| Add state key | `modules/*/manifest.json`, `components/modesp_core/include/modesp/shared_state.h` |
+| Add WebUI page | `webui/src/pages/`, `webui/src/api.ts` |
+| Debug issue | `esp_log.h` patterns, `tests/host/` for unit tests |
+| Release | `.rules/quality/eval.md` checklist |
 
-Firmware compiles with `-Werror=all` — every warning is a build failure.
+---
 
-### Quality Checklist
+## Quick Answers
 
-- [ ] No heap allocation in hot path
-- [ ] No edits to generated files
-- [ ] No secrets in staged changes
-- [ ] State keys follow `module.key` format
-- [ ] RW keys have min/max/step or options
-- [ ] Equipment arbitration order preserved
-- [ ] Interlocks respected (defrost + compressor never both ON)
-- [ ] Tests pass (pytest + doctest)
-- [ ] Manifest changes → regenerate artifacts
+**Q: How do I add a thermostat parameter?**  
+A: Edit `modules/thermostat/manifest.json`, add key to `state`, rebuild. UI auto-generates setting card.
 
-## Key Files for Context
+**Q: Why can't I use `std::string`?**  
+A: ESP32 has 320 KB RAM. Heap fragmentation in 24/7 operation causes crashes. Use `etl::string<32>`.
 
-| When working on... | Read these |
-|---|---|
-| Any C++ code | `.rules/core/constraints.md`, `.rules/generation/patterns.md` |
-| Architecture decisions | `ARCHITECTURE.md`, `.rules/core/architecture.md` |
-| API / state keys | `.rules/context/references.md` |
-| Manifests / generator | `tools/generate_ui.py`, `modules/*/manifest.json` |
-| Commits / docs | `.rules/generation/output.md` |
-| Code review | `.rules/quality/eval.md` |
-| Board/hardware | `boards/kc868a6/board.json`, `boards/kc868a6/bindings.json` |
-| WebUI | `webui/src/`, `data/i18n/` |
+**Q: How do I read a sensor value in a module?**  
+A: Equipment publishes it to SharedState. Read via `state_->get_or("equipment.air_temp", 0.0f)`.
 
-## Full Rules
+**Q: Can I call Equipment driver methods directly from my module?**  
+A: **NO.** Only Equipment touches drivers. Publish requests to SharedState; Equipment arbitrates.
 
-Detailed rules, patterns, and examples are in `.rules/` (structured by core/context/generation/quality).
+**Q: How do I test my code?**  
+A: C++ logic → doctest in `tests/host/`. Manifests → pytest in `tools/tests/`. WebUI → manual browser check.
+
+**Q: What should I commit?**  
+A: Source code, tests, docs, manifests, board configs. **NOT:** `generated/`, secrets, large binaries.
+
+**Q: How do I debug MQTT issues?**  
+A: Check `mqtt_service.cpp` logs. Verify broker URL + cert. Test with `mosquitto_sub` on desktop.
+
+**Q: Can I edit the WebUI bundle directly?**  
+A: **NO.** Edit `webui/src/`, then build: `npm run build && npm run deploy`.
+
+---
+
+## Final Notes
+
+- **This is production code.** 500+ tests, running on real equipment. Changes should be conservative and tested.
+- **Team of agents.** 7 roles with specific scopes. Check `.rules/context/roles.md` for your role.
+- **Manifest-driven.** JSON is single source of truth. Python generator makes it consistent across layers.
+- **Hardware abstraction matters.** Test on dev board first (GPIO relays are simpler than I2C PCF8574).
+- **Zero heap critical.** ESP32's 320 KB RAM can't afford fragmentation. ETL only.
+
+---
+
+**Last Updated:** 2026-03-31  
+**Version:** 1.0  
+**Maintainer:** Claude Code (Anthropic)
