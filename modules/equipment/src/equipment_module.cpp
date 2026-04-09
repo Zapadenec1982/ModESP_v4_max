@@ -89,10 +89,6 @@ void EquipmentModule::bind_drivers(modesp::DriverManager& dm) {
     light_ = dm.find_actuator("light");
     if (light_) ESP_LOGI(TAG, "Light relay bound");
 
-    // Block H: EEV valve driver (optional)
-    eev_driver_ = dm.find_actuator("eev");
-    if (eev_driver_) ESP_LOGI(TAG, "EEV valve driver bound");
-
     // Per-zone driver binding (when zone_count_ >= 2)
     if (zone_count_ >= 2) {
         zones_[0].air_sensor      = dm.find_sensor("air_temp_z1");
@@ -126,6 +122,11 @@ void EquipmentModule::bind_drivers(modesp::DriverManager& dm) {
                 ESP_LOGI(TAG, "  Zone %d: shared evaporator (no per-zone hardware)", (int)(z + 1));
             }
         }
+    } else {
+        // Single-zone: eev_z1 (новий формат) або eev (legacy)
+        eev_driver_ = dm.find_actuator("eev_z1");
+        if (!eev_driver_) eev_driver_ = dm.find_actuator("eev");
+        if (eev_driver_) ESP_LOGI(TAG, "EEV valve driver bound");
     }
 }
 

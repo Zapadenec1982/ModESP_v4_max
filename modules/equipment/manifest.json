@@ -16,7 +16,6 @@
     {"role": "light",          "type": "actuator", "driver": ["relay", "pcf8574_relay"], "label": "Освітлення камери",    "optional": true},
     {"role": "suction_p",     "type": "sensor",   "driver": ["pressure_adc"],          "label": "Тиск всмоктування",    "optional": true},
     {"role": "discharge_p",   "type": "sensor",   "driver": ["pressure_adc"],          "label": "Тиск нагнітання",      "optional": true},
-    {"role": "eev",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "eev_pcf8574_stepper", "akv_pulse"], "label": "Клапан EEV", "optional": true},
 
     {"role": "air_temp_z2",      "type": "sensor",   "driver": ["ds18b20", "ntc"],          "label": "Темп. камери зона 2",        "optional": true},
     {"role": "evap_temp_z1",     "type": "sensor",   "driver": ["ds18b20", "ntc"],          "label": "Темп. випарника зона 1",     "optional": true},
@@ -27,8 +26,8 @@
     {"role": "defrost_relay_z2", "type": "actuator", "driver": ["relay", "pcf8574_relay"],  "label": "Реле відтайки зона 2",       "optional": true},
     {"role": "evap_fan_z1",      "type": "actuator", "driver": ["relay", "pcf8574_relay"],  "label": "Вент. випарника зона 1",     "optional": true},
     {"role": "evap_fan_z2",      "type": "actuator", "driver": ["relay", "pcf8574_relay"],  "label": "Вент. випарника зона 2",     "optional": true},
-    {"role": "eev_z1",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "akv_pulse"], "label": "Клапан EEV зона 1", "optional": true},
-    {"role": "eev_z2",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "akv_pulse"], "label": "Клапан EEV зона 2", "optional": true},
+    {"role": "eev_z1",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "eev_pcf8574_stepper", "akv_pulse"], "label": "Клапан EEV зона 1", "optional": true, "zone_min": 0},
+    {"role": "eev_z2",           "type": "actuator", "driver": ["eev_analog", "eev_stepper", "eev_pcf8574_stepper", "akv_pulse"], "label": "Клапан EEV зона 2", "optional": true},
 
     {"role": "air_temp_backup",  "type": "sensor",   "driver": ["ds18b20", "ntc"], "label": "Резервний датчик камери",  "optional": true},
     {"role": "air_zone_1",       "type": "sensor",   "driver": ["ds18b20", "ntc"], "label": "Зона вимірювання 1",       "optional": true},
