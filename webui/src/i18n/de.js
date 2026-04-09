@@ -94,6 +94,8 @@ export default {
   'chart.ch_cond': 'Verflüssiger',
   'chart.ch_setpoint': 'Sollwert',
   'chart.ch_humidity': 'Feuchte',
+  'chart.ch_air_z2': 'Kammer Z2',
+  'chart.ch_evap_z2': 'Verdampfer Z2',
   'chart.legend_comp': 'Verd.',
   'chart.legend_defrost': 'Abtauung',
   'chart.legend_setpoint': 'Sollwert',

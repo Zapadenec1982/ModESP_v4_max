@@ -61,7 +61,7 @@ bool NtcDriver::init() {
     chan_cfg.bitwidth = ADC_BITWIDTH_12;
     chan_cfg.atten = (adc_atten_t)atten_;
 
-    err = adc_oneshot_config_channel(adc_handle_, adc_channel_, &chan_cfg);
+    esp_err_t err = adc_oneshot_config_channel(adc_handle_, adc_channel_, &chan_cfg);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "[%s] ADC channel config failed: %s", role_.c_str(), esp_err_to_name(err));
         return false;

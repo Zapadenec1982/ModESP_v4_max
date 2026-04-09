@@ -18,7 +18,7 @@
 static constexpr int16_t TEMP_NO_DATA = INT16_MIN;  // -32768
 
 /// Максимум каналів у записі
-static constexpr int MAX_CHANNELS = 6;
+static constexpr int MAX_CHANNELS = 8;
 
 /// Визначення каналу (compile-time)
 struct ChannelDef {
@@ -35,15 +35,17 @@ static constexpr ChannelDef CHANNEL_DEFS[MAX_CHANNELS] = {
     {"cond",     "equipment.cond_temp",     "datalogger.log_cond",      "equipment.has_cond_temp"   },
     {"setpoint", "thermostat.setpoint",     "datalogger.log_setpoint",  nullptr                     },
     {"humidity", "equipment.humidity",      "datalogger.log_humidity",  "equipment.has_humidity"    },
+    {"air_z2",   "equipment.air_temp_z2",  nullptr,                    nullptr                     },
+    {"evap_z2",  "equipment.evap_temp_z2", nullptr,                    nullptr                     },
     {nullptr,    nullptr,                   nullptr,                    nullptr                     },
 };
 
-/// Запис температури (16 bytes, 6 каналів)
+/// Запис температури (20 bytes, 8 каналів)
 struct TempRecord {
     uint32_t timestamp;      ///< UNIX epoch (секунди) або uptime_sec
     int16_t  ch[MAX_CHANNELS]; ///< Канали ×10 (TEMP_NO_DATA = немає даних)
 };
-static_assert(sizeof(TempRecord) == 16, "TempRecord must be 16 bytes");
+static_assert(sizeof(TempRecord) == 20, "TempRecord must be 20 bytes");
 
 /// Тип події
 enum EventType : uint8_t {
@@ -135,7 +137,7 @@ private:
     // ── Налаштування (cached) ──
     int32_t  sample_interval_ms_ = 60000;
     int32_t  retention_hours_    = 48;
-    bool     ch_enabled_[MAX_CHANNELS] = {true, false, false, false, false, false};
+    bool     ch_enabled_[MAX_CHANNELS] = {true, false, false, false, false, false, false, false};
 
     // ── Статистика ──
     uint32_t temp_count_  = 0;

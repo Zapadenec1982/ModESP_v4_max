@@ -99,7 +99,7 @@ bool DataLoggerModule::on_init() {
     // Створити директорію логів
     mkdir(LOG_DIR, 0775);
 
-    // Міграція старого формату (8/12 bytes → 16 bytes)
+    // Міграція старого формату (8/12/16 bytes → 20 bytes)
     migrate_old_format();
 
     sync_settings();

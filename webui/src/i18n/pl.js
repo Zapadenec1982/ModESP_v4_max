@@ -94,6 +94,8 @@ export default {
   'chart.ch_cond': 'Skraplacz',
   'chart.ch_setpoint': 'Nastawa',
   'chart.ch_humidity': 'Wilgotność',
+  'chart.ch_air_z2': 'Komora Z2',
+  'chart.ch_evap_z2': 'Parownik Z2',
   'chart.legend_comp': 'Spr.',
   'chart.legend_defrost': 'Odszran.',
   'chart.legend_setpoint': 'Nastawa',

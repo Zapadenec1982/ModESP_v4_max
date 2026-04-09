@@ -366,7 +366,7 @@ void EevModule::on_update(uint32_t dt_ms) {
             break;
 
         // ── LOW_SH_PROTECT: superheat dangerously low ──
-        case State::LOW_SH_PROTECT:
+        case State::LOW_SH_PROTECT: {
             if (!compressor_on_) {
                 enter_state(State::IDLE);
                 break;
@@ -401,6 +401,7 @@ void EevModule::on_update(uint32_t dt_ms) {
                 enter_state(State::RUNNING);
             }
             break;
+        }
 
         // ── DEFROST: valve closed until defrost ends ──
         case State::DEFROST:

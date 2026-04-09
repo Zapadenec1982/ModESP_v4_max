@@ -99,6 +99,8 @@ export default {
   'chart.ch_cond': 'Конденсатор',
   'chart.ch_setpoint': 'Уставка',
   'chart.ch_humidity': 'Вологість',
+  'chart.ch_air_z2': 'Камера Z2',
+  'chart.ch_evap_z2': 'Випарник Z2',
   'chart.legend_comp': 'Комп.',
   'chart.legend_defrost': 'Дефрост',
   'chart.legend_setpoint': 'Уставка',

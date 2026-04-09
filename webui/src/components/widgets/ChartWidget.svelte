@@ -24,7 +24,8 @@
   const CH_STATE_KEYS = {
     air: 'equipment.air_temp', evap: 'equipment.evap_temp',
     cond: 'equipment.cond_temp', setpoint: 'thermostat.setpoint',
-    humidity: 'equipment.humidity'
+    humidity: 'equipment.humidity',
+    air_z2: 'equipment.air_temp_z2', evap_z2: 'equipment.evap_temp_z2'
   };
 
   // SVG dimensions
@@ -48,7 +49,8 @@
   // i18n ключі для відомих каналів
   const CH_TKEYS = {
     air: 'chart.ch_air', evap: 'chart.ch_evap', cond: 'chart.ch_cond',
-    setpoint: 'chart.ch_setpoint', humidity: 'chart.ch_humidity'
+    setpoint: 'chart.ch_setpoint', humidity: 'chart.ch_humidity',
+    air_z2: 'chart.ch_air_z2', evap_z2: 'chart.ch_evap_z2'
   };
 
   async function loadData() {
@@ -68,13 +70,9 @@
   onDestroy(() => { if (refreshTimer) clearInterval(refreshTimer); });
 
   // Reactive live update: збираємо актуальні значення каналів з $state
-  $: liveVals = {
-    air: $state['equipment.air_temp'],
-    evap: $state['equipment.evap_temp'],
-    cond: $state['equipment.cond_temp'],
-    setpoint: $state['thermostat.setpoint'],
-    humidity: $state['equipment.humidity']
-  };
+  $: liveVals = Object.fromEntries(
+    Object.entries(CH_STATE_KEYS).map(([ch, key]) => [ch, $state[key]])
+  );
   $: if (data?.temp && liveVals) {
     const now = Math.floor(Date.now() / 1000);
     if (now - lastLiveTs >= LIVE_THROTTLE) {

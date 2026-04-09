@@ -94,6 +94,8 @@ export default {
   'chart.ch_cond': 'Condenser',
   'chart.ch_setpoint': 'Setpoint',
   'chart.ch_humidity': 'Humidity',
+  'chart.ch_air_z2': 'Chamber Z2',
+  'chart.ch_evap_z2': 'Evaporator Z2',
   'chart.legend_comp': 'Comp.',
   'chart.legend_defrost': 'Defrost',
   'chart.legend_setpoint': 'Setpoint',

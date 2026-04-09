@@ -167,7 +167,7 @@ bool EevPcf8574StepperDriver::do_step() {
     expander_->output_state |= (1 << step_pin_);
     if (!expander_->write_state()) {
         ESP_LOGW(TAG, "[%s] I2C STEP write failed", role_.c_str());
-        return;  // Не інкрементуємо position — крок не виконано
+        return false;  // Не інкрементуємо position — крок не виконано
     }
 
     // STEP LOW (I2C write ~0.3ms = достатня ширина імпульсу)
