@@ -191,6 +191,29 @@ static int read_file_to_buf(const char* path, char* buf, size_t buf_size) {
     return len;
 }
 
+// Helper: stream a JSON file from LittleFS as chunked HTTP response (zero-copy, O(1) RAM)
+static esp_err_t serve_json_file_chunked(httpd_req_t* req, const char* path, const char* not_found_msg) {
+    FILE* f = fopen(path, "r");
+    if (!f) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, not_found_msg);
+        return ESP_FAIL;
+    }
+    HttpService::set_cors_headers(req);
+    httpd_resp_set_type(req, "application/json");
+    char buf[512];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+        if (httpd_resp_send_chunk(req, buf, n) != ESP_OK) {
+            fclose(f);
+            httpd_resp_send_chunk(req, nullptr, 0);
+            return ESP_FAIL;
+        }
+    }
+    fclose(f);
+    httpd_resp_send_chunk(req, nullptr, 0);
+    return ESP_OK;
+}
+
 // AUDIT-004: JSON escape для string значень (захист від SSID з лапками тощо)
 // Ескейпить ", \, і control characters. Пише в dest, повертає кількість записаних байт.
 static size_t json_escape_str(char* dest, size_t dest_size, const char* src) {
@@ -280,56 +303,15 @@ esp_err_t HttpService::handle_get_state(httpd_req_t* req) {
 }
 
 esp_err_t HttpService::handle_get_board(httpd_req_t* req) {
-    char buf[3072];  // board.json ~2.9KB
-    int len = read_file_to_buf("/data/board.json", buf, sizeof(buf));
-    if (len < 0) {
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "board.json not found");
-        return ESP_FAIL;
-    }
-
-    set_cors_headers(req);
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, buf, len);
-    return ESP_OK;
+    return serve_json_file_chunked(req, "/data/board.json", "board.json not found");
 }
 
 esp_err_t HttpService::handle_get_ui(httpd_req_t* req) {
-    FILE* f = fopen("/data/ui.json", "r");
-    if (!f) {
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "ui.json not found");
-        return ESP_FAIL;
-    }
-
-    set_cors_headers(req);
-    httpd_resp_set_type(req, "application/json");
-
-    // Стрімінг файлу чанками — ui.json може бути >4KB
-    char buf[512];
-    size_t read_bytes;
-    while ((read_bytes = fread(buf, 1, sizeof(buf), f)) > 0) {
-        if (httpd_resp_send_chunk(req, buf, read_bytes) != ESP_OK) {
-            fclose(f);
-            httpd_resp_send_chunk(req, nullptr, 0);
-            return ESP_FAIL;
-        }
-    }
-    fclose(f);
-    httpd_resp_send_chunk(req, nullptr, 0);
-    return ESP_OK;
+    return serve_json_file_chunked(req, "/data/ui.json", "ui.json not found");
 }
 
 esp_err_t HttpService::handle_get_bindings(httpd_req_t* req) {
-    char buf[4096];
-    int len = read_file_to_buf("/data/bindings.json", buf, sizeof(buf));
-    if (len < 0) {
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "bindings.json not found");
-        return ESP_FAIL;
-    }
-
-    set_cors_headers(req);
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, buf, len);
-    return ESP_OK;
+    return serve_json_file_chunked(req, "/data/bindings.json", "bindings.json not found");
 }
 
 esp_err_t HttpService::handle_post_bindings(httpd_req_t* req) {
