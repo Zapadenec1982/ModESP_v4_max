@@ -358,9 +358,9 @@ esp_err_t HttpService::handle_post_bindings(httpd_req_t* req) {
 
     // Мінімальна валідація JSON: manifest_version + bindings array
     jsmn_parser parser;
-    jsmntok_t tokens[96];  // ~10 bindings × ~8 tokens/binding + overhead
+    jsmntok_t tokens[160];  // ~15 bindings × ~10 tokens/binding + overhead
     jsmn_init(&parser);
-    int r = jsmn_parse(&parser, buf, total, tokens, 96);
+    int r = jsmn_parse(&parser, buf, total, tokens, 160);
     if (r < 1 || tokens[0].type != JSMN_OBJECT) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
         return ESP_FAIL;
