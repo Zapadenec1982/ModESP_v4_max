@@ -319,7 +319,7 @@ esp_err_t HttpService::handle_get_ui(httpd_req_t* req) {
 }
 
 esp_err_t HttpService::handle_get_bindings(httpd_req_t* req) {
-    char buf[2048];
+    char buf[4096];
     int len = read_file_to_buf("/data/bindings.json", buf, sizeof(buf));
     if (len < 0) {
         httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "bindings.json not found");
@@ -334,8 +334,8 @@ esp_err_t HttpService::handle_get_bindings(httpd_req_t* req) {
 
 esp_err_t HttpService::handle_post_bindings(httpd_req_t* req) {
     if (!check_auth(req)) return ESP_OK;
-    // Приймаємо JSON body — bindings.json до ~2KB з 11+ bindings
-    char buf[2048];
+    // Приймаємо JSON body — bindings.json до ~4KB з 20+ bindings
+    char buf[4096];
     int total = 0;
     int remaining = req->content_len;
     if (remaining <= 0 || remaining >= (int)sizeof(buf)) {
