@@ -76,6 +76,12 @@ private:
     static constexpr uint32_t MQTT_INITIAL_RECONNECT_MS = 5000;   // 5s
     static constexpr uint32_t MQTT_MAX_RECONNECT_MS = 300000;     // 5 min
 
+    // HTTPS bootstrap fallback (when MQTT auth fails repeatedly)
+    uint8_t auth_fail_count_ = 0;
+    bool bootstrap_pending_ = false;
+    static constexpr uint8_t AUTH_FAIL_THRESHOLD = 3;
+    void try_https_bootstrap();
+
     // Periodic alarm re-publish (retain + QoS 1)
     uint32_t alarm_republish_timer_ms_ = 0;
     static constexpr uint32_t ALARM_REPUBLISH_INTERVAL_MS = 300000; // 5 min

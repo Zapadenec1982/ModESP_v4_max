@@ -21,6 +21,7 @@
 #include "esp_wifi.h"
 #include "esp_app_desc.h"
 #include "esp_timer.h"
+#include "esp_http_client.h"
 
 #include "jsmn.h"
 
@@ -187,6 +188,13 @@ void MqttService::on_update(uint32_t dt_ms) {
         return;
     }
 
+    // HTTPS bootstrap fallback (deferred з MQTT callback для безпечного стеку)
+    if (bootstrap_pending_) {
+        bootstrap_pending_ = false;
+        try_https_bootstrap();
+        return;  // reconnect_requested_ вже встановлено в try_https_bootstrap()
+    }
+
     // Reconnect з exponential backoff (client створено, але не з'єднано)
     if (client_ && !connected_ && enabled_) {
         reconnect_timer_ms_ += dt_ms;
@@ -266,6 +274,89 @@ void MqttService::on_update(uint32_t dt_ms) {
 
 void MqttService::on_stop() {
     stop_client();
+}
+
+// ── HTTPS bootstrap fallback ────────────────────────────────────
+// Викликається після AUTH_FAIL_THRESHOLD невдалих підключень до MQTT.
+// Надсилає POST /api/devices/register на хмарний сервер з bootstrap key,
+// щоб скинути credentials пристрою в базі на bootstrap.
+
+void MqttService::try_https_bootstrap() {
+#ifdef CONFIG_MODESP_CLOUD_MQTT
+    const char* bootstrap_pass = CONFIG_MODESP_MQTT_BOOTSTRAP_PASSWORD;
+    if (strlen(bootstrap_pass) == 0) {
+        ESP_LOGW(TAG, "Bootstrap: no password configured in Kconfig");
+        return;
+    }
+
+    // Витягуємо hostname з broker_ (broker_ = "mqtts://host" або "host")
+    char host[64] = {};
+    const char* p = broker_;
+    if (strncmp(p, "mqtts://", 8) == 0) p += 8;
+    else if (strncmp(p, "mqtt://", 7) == 0) p += 7;
+    // Відрізаємо порт якщо є
+    const char* colon = strchr(p, ':');
+    size_t len = colon ? (size_t)(colon - p) : strlen(p);
+    if (len >= sizeof(host)) len = sizeof(host) - 1;
+    memcpy(host, p, len);
+    host[len] = '\0';
+
+    // POST body: {"device_id":"A4CF12","bootstrap_key":"..."}
+    char body[256];
+    snprintf(body, sizeof(body),
+             "{\"device_id\":\"%s\",\"bootstrap_key\":\"%s\"}",
+             device_id_, bootstrap_pass);
+
+    char url[128];
+    snprintf(url, sizeof(url), "https://%s/api/devices/register", host);
+
+    ESP_LOGW(TAG, "Bootstrap: calling %s for device %s", url, device_id_);
+
+    esp_http_client_config_t cfg = {};
+    cfg.url = url;
+    cfg.method = HTTP_METHOD_POST;
+    cfg.crt_bundle_attach = esp_crt_bundle_attach;
+    cfg.timeout_ms = 10000;
+
+    esp_http_client_handle_t client = esp_http_client_init(&cfg);
+    if (!client) {
+        ESP_LOGE(TAG, "Bootstrap: HTTP client init failed");
+        return;
+    }
+
+    esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_post_field(client, body, strlen(body));
+
+    esp_err_t err = esp_http_client_perform(client);
+    int status = esp_http_client_get_status_code(client);
+    esp_http_client_cleanup(client);
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Bootstrap: HTTP request failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    if (status == 200 || status == 201) {
+        ESP_LOGW(TAG, "Bootstrap: server reset credentials (HTTP %d), "
+                 "switching to bootstrap password and reconnecting...", status);
+        // Оновлюємо credentials на bootstrap
+        strncpy(pass_, bootstrap_pass, sizeof(pass_) - 1);
+        pass_[sizeof(pass_) - 1] = '\0';
+        // Очищуємо tenant/prefix для pending
+        tenant_[0] = '\0';
+        prefix_[0] = '\0';
+        nvs_helper::erase_key("mqtt", "tenant");
+        nvs_helper::erase_key("mqtt", "prefix");
+        nvs_helper::write_str("mqtt", "pass", pass_);
+        build_default_prefix();
+        // Скидаємо лічильник і перепідключаємось
+        auth_fail_count_ = 0;
+        reconnect_delay_ms_ = MQTT_INITIAL_RECONNECT_MS;
+        reconnect_requested_ = true;
+    } else {
+        ESP_LOGE(TAG, "Bootstrap: server returned HTTP %d", status);
+    }
+#endif
 }
 
 // ── MQTT client ─────────────────────────────────────────────────
@@ -367,6 +458,7 @@ void MqttService::mqtt_event_handler(void* args, esp_event_base_t base,
             self->connected_ = true;
             self->reconnect_timer_ms_ = 0;
             self->reconnect_delay_ms_ = MQTT_INITIAL_RECONNECT_MS;
+            self->auth_fail_count_ = 0;  // Успішне підключення — скидаємо лічильник
             self->last_version_ = 0;  // Форсуємо повну публікацію
             self->state_set("mqtt.connected", true);
             self->state_set("mqtt.status", "connected");
@@ -416,6 +508,14 @@ void MqttService::mqtt_event_handler(void* args, esp_event_base_t base,
             self->state_set("mqtt.connected", false);
             self->state_set("mqtt.status", "disconnected");
             ESP_LOGW(TAG, "Disconnected from broker");
+
+            // Лічильник послідовних невдач — якщо >= порогу, запускаємо HTTPS bootstrap
+            self->auth_fail_count_++;
+            if (self->auth_fail_count_ >= AUTH_FAIL_THRESHOLD && !self->bootstrap_pending_) {
+                self->bootstrap_pending_ = true;
+                ESP_LOGW(TAG, "Auth failed %d times, will try HTTPS bootstrap",
+                         self->auth_fail_count_);
+            }
             break;
 
         case MQTT_EVENT_DATA:
