@@ -45,6 +45,9 @@ bool write_bool(const char* ns, const char* key, bool value);
 /// Erase a single key from NVS. Returns false on error.
 bool erase_key(const char* ns, const char* key);
 
+/// Erase all keys in a namespace. Returns false on error. Safe on empty namespaces.
+bool erase_all(const char* ns);
+
 /// Read a blob (binary data) from NVS. Returns actual size in out_len. Returns false if not found.
 bool read_blob(const char* ns, const char* key, void* out, size_t max_len, size_t& out_len);
 

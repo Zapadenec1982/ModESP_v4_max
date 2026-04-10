@@ -817,12 +817,39 @@ esp_err_t HttpService::handle_post_restart(httpd_req_t* req) {
     return ESP_OK; // never reached
 }
 
+// Скидання налаштувань бізнес-логіки, MQTT → pending, зберігає WiFi/MQTT credentials
+esp_err_t HttpService::handle_post_reset_settings(httpd_req_t* req) {
+    if (!check_auth(req)) return ESP_OK;
+    auto* self = static_cast<HttpService*>(req->user_ctx);
+    set_cors_headers(req);
+    httpd_resp_set_type(req, "application/json");
+
+    ESP_LOGW("HTTP", "RESET SETTINGS — erasing persist namespace, resetting MQTT to pending...");
+
+    // 1. Стерти всі налаштування бізнес-логіки (thermostat, defrost, protection, EEV, etc.)
+    nvs_helper::erase_all("persist");
+
+    // 2. Скинути MQTT до pending стану (зберігає broker/user/pass/enabled)
+    nvs_helper::erase_key("mqtt", "tenant");
+    nvs_helper::erase_key("mqtt", "prefix");
+
+    httpd_resp_sendstr(req, "{\"ok\":true,\"msg\":\"Settings reset. Restarting...\"}");
+
+    if (self->modules_) {
+        self->modules_->stop_all();
+    }
+    vTaskDelay(pdMS_TO_TICKS(500));
+    esp_restart();
+    return ESP_OK; // never reached
+}
+
+// Повне скидання — стирає ВСЕ: NVS (WiFi, MQTT, auth, settings). Для передачі пристрою.
 esp_err_t HttpService::handle_post_factory_reset(httpd_req_t* req) {
     if (!check_auth(req)) return ESP_OK;
     set_cors_headers(req);
     httpd_resp_set_type(req, "application/json");
 
-    ESP_LOGW("HTTP", "FACTORY RESET — erasing NVS partition...");
+    ESP_LOGW("HTTP", "FULL FACTORY RESET — erasing entire NVS partition...");
     esp_err_t err = nvs_flash_erase();
     if (err != ESP_OK) {
         ESP_LOGE("HTTP", "NVS erase failed: %s", esp_err_to_name(err));
@@ -830,9 +857,8 @@ esp_err_t HttpService::handle_post_factory_reset(httpd_req_t* req) {
         return ESP_FAIL;
     }
 
-    httpd_resp_sendstr(req, "{\"ok\":true,\"msg\":\"Factory reset. Restarting...\"}");
+    httpd_resp_sendstr(req, "{\"ok\":true,\"msg\":\"Full factory reset. Restarting...\"}");
 
-    // Graceful shutdown: flush DataLogger RAM → flash
     auto* self = static_cast<HttpService*>(req->user_ctx);
     if (self->modules_) {
         self->modules_->stop_all();
@@ -1665,7 +1691,8 @@ void HttpService::register_api_handlers() {
         {"/api/wifi/ap",    HTTP_GET,  handle_get_wifi_ap},
         {"/api/wifi/ap",    HTTP_POST, handle_post_wifi_ap},
         {"/api/restart",    HTTP_POST, handle_post_restart},
-        {"/api/factory-reset", HTTP_POST, handle_post_factory_reset},
+        {"/api/factory-reset",      HTTP_POST, handle_post_reset_settings},
+        {"/api/factory-reset-full", HTTP_POST, handle_post_factory_reset},
         {"/api/backup",  HTTP_GET,  handle_get_backup},
         {"/api/restore", HTTP_POST, handle_post_restore},
         {"/api/ota",        HTTP_GET,  handle_get_ota},
@@ -1680,7 +1707,7 @@ void HttpService::register_api_handlers() {
 
     // Реєструємо handlers + OPTIONS для CORS preflight
     // Використовуємо масив для відстеження URI, де OPTIONS вже зареєстрований
-    const char* options_registered[24] = {};
+    const char* options_registered[26] = {};
     int options_count = 0;
 
     for (auto& ep : endpoints) {

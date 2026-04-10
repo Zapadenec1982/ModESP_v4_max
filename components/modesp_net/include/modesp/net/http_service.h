@@ -16,7 +16,8 @@
  *   POST /api/wifi/ap   — save AP configuration
  *   GET  /api/onewire/scan — scan OneWire bus for DS18B20 devices
  *   POST /api/restart  — restart ESP32
- *   POST /api/factory-reset — erase NVS + restart (factory defaults)
+ *   POST /api/factory-reset      — reset settings + MQTT to pending (keeps WiFi/MQTT creds)
+ *   POST /api/factory-reset-full — erase ALL NVS + restart (full factory defaults)
  *   GET  /[path]       — static files from LittleFS /data/www/
  */
 
@@ -93,6 +94,7 @@ private:
     static esp_err_t handle_get_wifi_ap(httpd_req_t* req);
     static esp_err_t handle_post_wifi_ap(httpd_req_t* req);
     static esp_err_t handle_post_restart(httpd_req_t* req);
+    static esp_err_t handle_post_reset_settings(httpd_req_t* req);
     static esp_err_t handle_post_factory_reset(httpd_req_t* req);
     static esp_err_t handle_get_backup(httpd_req_t* req);
     static esp_err_t handle_post_restore(httpd_req_t* req);

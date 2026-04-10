@@ -33,6 +33,30 @@ menu "ModESP Configuration"
         config MODESP_CLOUD_AWS
             bool "AWS IoT Core"
     endchoice
+
+    config MODESP_MQTT_DEFAULT_BROKER
+        string "Default MQTT broker URL"
+        default "mqtts://modesp.com.ua"
+        depends on MODESP_CLOUD_MQTT
+        help
+            Fallback MQTT broker when NVS is empty (after full reflash).
+            Used by MqttService when broker is not configured in NVS.
+
+    config MODESP_MQTT_DEFAULT_PORT
+        int "Default MQTT broker port"
+        default 8883
+        depends on MODESP_CLOUD_MQTT
+        help
+            Fallback MQTT port when NVS is empty.
+
+    config MODESP_MQTT_BOOTSTRAP_PASSWORD
+        string "Bootstrap MQTT password"
+        default ""
+        depends on MODESP_CLOUD_MQTT
+        help
+            Shared bootstrap password for initial MQTT connection.
+            Must match MQTT_BOOTSTRAP_PASSWORD in cloud .env.
+            Only grants access to pending namespace (minimal privilege).
     config MODESP_MODBUS_ENABLED
         bool "Enable Modbus RTU Slave (RS-485)"
         default n

@@ -150,6 +150,24 @@ bool erase_key(const char* ns, const char* key) {
     return err == ESP_OK || err == ESP_ERR_NVS_NOT_FOUND;
 }
 
+bool erase_all(const char* ns) {
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(ns, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "NVS open '%s' for erase_all failed: %s", ns, esp_err_to_name(err));
+        return false;
+    }
+    err = nvs_erase_all(handle);
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+    nvs_close(handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "NVS erase_all '%s' failed: %s", ns, esp_err_to_name(err));
+    }
+    return err == ESP_OK;
+}
+
 // --- Batch API: один open/close для множинних операцій ---
 
 nvs_handle_t batch_open(const char* ns, bool readonly) {

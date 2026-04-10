@@ -42,7 +42,8 @@
 <div class="btn-widget">
   <button
     class="action-btn"
-    class:danger={!!config.confirm}
+    class:danger={config.style === 'danger'}
+    class:warning={config.style === 'warning'}
     disabled={loading}
     on:click={onClick}
   >
@@ -66,6 +67,13 @@
   }
   .action-btn:active:not(:disabled) { transform: translateY(0); }
   .action-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .action-btn.warning {
+    background: linear-gradient(135deg, #b45309, #92400e);
+    box-shadow: 0 2px 8px rgba(180,83,9,0.3);
+  }
+  .action-btn.warning:hover:not(:disabled) {
+    box-shadow: 0 4px 12px rgba(245,158,11,0.4);
+  }
   .action-btn.danger {
     background: linear-gradient(135deg, #991b1b, #7f1d1d);
     box-shadow: 0 2px 8px rgba(153,27,27,0.3);

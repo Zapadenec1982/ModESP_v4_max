@@ -9,16 +9,25 @@
   const ROLE_STATE_KEY = {
     air_temp: 'equipment.air_temp', evap_temp: 'equipment.evap_temp',
     condenser_temp: 'equipment.cond_temp',
+    air_temp_z2: 'equipment.air_temp_z2', evap_temp_z2: 'equipment.evap_temp_z2',
     compressor: 'equipment.compressor', defrost_relay: 'equipment.defrost_relay',
-    evap_fan: 'equipment.evap_fan', cond_fan: 'equipment.cond_fan',
+    defrost_relay_z2: 'equipment.defrost_relay_z2',
+    evap_fan: 'equipment.evap_fan', evap_fan_z2: 'equipment.evap_fan_z2',
+    cond_fan: 'equipment.cond_fan',
     door_contact: 'equipment.door_open',
+    eev_z1: 'eev_z1.valve_pos', eev_z2: 'eev_z2.valve_pos',
+    suction_pressure: 'equipment.suction_bar',
   };
   const ROLE_OK_KEY = {
     air_temp: 'equipment.sensor1_ok', evap_temp: 'equipment.sensor2_ok',
   };
+  const PERCENT_ROLES = new Set(['eev_z1', 'eev_z2']);
+  const BAR_ROLES = new Set(['suction_pressure']);
 
   function formatValue(role, val) {
     if (val === undefined || val === null) return '--';
+    if (PERCENT_ROLES.has(role)) return val.toFixed(1) + ' %';
+    if (BAR_ROLES.has(role)) return val.toFixed(2) + ' bar';
     if (typeof val === 'number') return val.toFixed(1) + ' °C';
     return val ? 'ON' : 'OFF';
   }

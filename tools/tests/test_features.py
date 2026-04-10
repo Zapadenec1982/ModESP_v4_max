@@ -198,7 +198,7 @@ class TestConstraintsResolver:
         constraints = resolver.resolve_constraints(defrost, active)
         assert "defrost.initiation" in constraints
         init_opts = constraints["defrost.initiation"]
-        assert len(init_opts) == 4
+        assert len(init_opts) == 6
         # Option 0 (таймер) та 3 (вимкнено) — без requires_state
         assert "requires_state" not in init_opts[0]
         assert "requires_state" not in init_opts[3]
@@ -251,15 +251,15 @@ class TestSelectWidgets:
         """State key з options → widget type 'select' в ui.json."""
         bindings = load_fixture("bindings_full.json")
         ui = self._generate_ui(all_manifests, project, bindings, equipment)
-        # Знаходимо defrost.type widget
+        # Знаходимо defrost_z1.type widget
         found = False
         for page in ui["pages"]:
             for card in page.get("cards", []):
                 for w in card.get("widgets", []):
-                    if w.get("key") == "defrost.type":
+                    if w.get("key") == "defrost_z1.type":
                         assert w["widget"] == "select"
                         found = True
-        assert found, "defrost.type widget not found"
+        assert found, "defrost_z1.type widget not found"
 
     def test_select_has_options_array(self, all_manifests, project, equipment):
         """Select widget має options масив з value+label."""
@@ -268,14 +268,14 @@ class TestSelectWidgets:
         for page in ui["pages"]:
             for card in page.get("cards", []):
                 for w in card.get("widgets", []):
-                    if w.get("key") == "defrost.type" and w.get("widget") == "select":
+                    if w.get("key") == "defrost_z1.type" and w.get("widget") == "select":
                         assert "options" in w
                         assert len(w["options"]) > 0
                         for opt in w["options"]:
                             assert "value" in opt
                             assert "label" in opt
                         return
-        pytest.fail("defrost.type select widget not found")
+        pytest.fail("defrost_z1.type select widget not found")
 
     def test_defrost_type_all_options_visible(self, all_manifests, project, equipment):
         """Defrost type shows all 3 options regardless of bindings."""
@@ -284,11 +284,11 @@ class TestSelectWidgets:
         for page in ui["pages"]:
             for card in page.get("cards", []):
                 for w in card.get("widgets", []):
-                    if w.get("key") == "defrost.type" and w.get("widget") == "select":
+                    if w.get("key") == "defrost_z1.type" and w.get("widget") == "select":
                         values = [o["value"] for o in w["options"]]
                         assert values == [0, 1, 2]
                         return
-        pytest.fail("defrost.type select widget not found")
+        pytest.fail("defrost_z1.type select widget not found")
 
     def test_numeric_settings_still_number_input(self, all_manifests, project, equipment):
         """Settings без options → widget 'number_input' як раніше."""
@@ -297,7 +297,7 @@ class TestSelectWidgets:
         for page in ui["pages"]:
             for card in page.get("cards", []):
                 for w in card.get("widgets", []):
-                    if w.get("key") == "thermostat.setpoint":
+                    if w.get("key") == "thermo_z1.setpoint":
                         assert w["widget"] == "slider" or w["widget"] == "number_input"
                         assert "options" not in w
                         return
@@ -336,7 +336,7 @@ class TestUIDisabledWidgets:
         """Disabled widget має disabled=true і disabled_reason."""
         bindings = load_fixture("bindings_minimal.json")
         ui = self._generate_ui(all_manifests, project, bindings, equipment)
-        w = self._find_widget(ui, "thermostat.evap_fan_mode")
+        w = self._find_widget(ui, "thermo_z1.evap_fan_mode")
         assert w is not None
         assert w.get("disabled") is True
         assert "disabled_reason" in w
@@ -345,7 +345,7 @@ class TestUIDisabledWidgets:
         """Widgets активних features НЕ мають disabled."""
         bindings = load_fixture("bindings_full.json")
         ui = self._generate_ui(all_manifests, project, bindings, equipment)
-        w = self._find_widget(ui, "thermostat.setpoint")
+        w = self._find_widget(ui, "thermo_z1.setpoint")
         assert w is not None
         assert w.get("disabled") is not True
 
@@ -353,7 +353,7 @@ class TestUIDisabledWidgets:
         """thermostat.setpoint ніколи disabled."""
         bindings = load_fixture("bindings_minimal.json")
         ui = self._generate_ui(all_manifests, project, bindings, equipment)
-        w = self._find_widget(ui, "thermostat.setpoint")
+        w = self._find_widget(ui, "thermo_z1.setpoint")
         assert w is not None
         assert w.get("disabled") is not True
 
@@ -451,7 +451,7 @@ class TestManifestOptions:
     def test_defrost_initiation_has_options(self, defrost):
         state = defrost["state"]["defrost.initiation"]
         assert "options" in state
-        assert len(state["options"]) == 4
+        assert len(state["options"]) == 6
 
     def test_options_keys_no_min_max_step(self, defrost):
         """Keys з options не повинні мати min/max/step."""

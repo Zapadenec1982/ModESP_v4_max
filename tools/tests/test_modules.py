@@ -121,7 +121,7 @@ class TestEquipmentManifest:
 
     def test_has_24_state_keys(self, equipment):
         """Equipment має 24 state keys."""
-        assert len(equipment["state"]) == 66
+        assert len(equipment["state"]) == 70
 
     def test_sensor_keys_readonly(self, equipment):
         """Sensor/actuator state keys — read-only, settings — readwrite."""
@@ -130,7 +130,9 @@ class TestEquipmentManifest:
                           "equipment.ntc_r_series", "equipment.ntc_r_nominal",
                           "equipment.ds18b20_offset",
                           "equipment.probe_offset_decay", "equipment.sensor_diff_threshold",
-                          "equipment.zone_agg_mode"}
+                          "equipment.zone_agg_mode",
+                          "equipment.cond_fan_mode", "equipment.cond_fan_on",
+                          "equipment.cond_fan_off", "equipment.cond_fan_low_limit"}
         for key, info in equipment["state"].items():
             if key in readwrite_keys:
                 assert info["access"] == "readwrite", f"{key} не readwrite"
@@ -542,7 +544,7 @@ class TestCrossModuleValidation:
     def test_total_state_keys(self, all_manifests):
         """Всього 231 state keys у 7 модулях."""
         total = sum(len(m.get("state", {})) for m in all_manifests)
-        assert total == 231
+        assert total == 235
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -681,7 +683,7 @@ class TestStateMetaFullProject:
         # datalogger: enabled, retention_hours, sample_interval, log_evap, log_cond,
         #   log_setpoint, log_humidity = 7 rw
         # Total: 61 (auto-counted from manifests)
-        assert "STATE_META_COUNT = 111" in result
+        assert "STATE_META_COUNT = 115" in result
 
     def test_persist_true_for_setpoint(self, all_manifests):
         """thermostat.setpoint — writable=true, persist=true."""

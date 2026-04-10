@@ -77,6 +77,7 @@
     <button
       class="grid-btn"
       class:danger={action.style === 'danger'}
+      class:warning={action.style === 'warning'}
       disabled={loadingId !== null}
       on:click={() => handleAction(action)}
     >
@@ -118,6 +119,11 @@
     color: var(--accent);
   }
   .grid-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .grid-btn.warning { color: var(--warn, #f59e0b); border-color: var(--warn, #f59e0b); }
+  .grid-btn.warning:hover:not(:disabled) {
+    background: var(--warn, #f59e0b);
+    color: #000;
+  }
   .grid-btn.danger { color: var(--error, #dc2626); border-color: var(--error, #dc2626); }
   .grid-btn.danger:hover:not(:disabled) {
     background: var(--error, #dc2626);

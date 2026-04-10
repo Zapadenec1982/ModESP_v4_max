@@ -63,7 +63,7 @@
   "features": {
     "superheat_control": {
       "description": "PI регулювання перегріву з EEV",
-      "requires_roles": ["eev"],
+      "requires_roles": ["eev_z1"],
       "controls_settings": [
         "eev.sh_target", "eev.kp", "eev.ki",
         "eev.startup_pos", "eev.startup_wait",

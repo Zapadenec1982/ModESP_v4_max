@@ -46,6 +46,29 @@ void MqttService::load_config() {
     if (nvs_helper::read_i32("mqtt", "port", p)) {
         port_ = static_cast<uint16_t>(p);
     }
+
+    // Kconfig fallbacks — тільки коли NVS повністю порожній (після reflash)
+#ifdef CONFIG_MODESP_CLOUD_MQTT
+    if (broker_[0] == '\0' && strlen(CONFIG_MODESP_MQTT_DEFAULT_BROKER) > 0) {
+        strncpy(broker_, CONFIG_MODESP_MQTT_DEFAULT_BROKER, sizeof(broker_) - 1);
+        broker_[sizeof(broker_) - 1] = '\0';
+        port_ = CONFIG_MODESP_MQTT_DEFAULT_PORT;
+        ESP_LOGW(TAG, "No broker in NVS — using Kconfig: %s:%d", broker_, port_);
+    }
+    if (user_[0] == '\0') {
+        // Bootstrap username з MAC адреси
+        uint8_t mac[6];
+        esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
+        snprintf(user_, sizeof(user_), "device_%02X%02X%02X", mac[3], mac[4], mac[5]);
+        ESP_LOGW(TAG, "No MQTT user in NVS — using bootstrap: %s", user_);
+    }
+    if (pass_[0] == '\0' && strlen(CONFIG_MODESP_MQTT_BOOTSTRAP_PASSWORD) > 0) {
+        strncpy(pass_, CONFIG_MODESP_MQTT_BOOTSTRAP_PASSWORD, sizeof(pass_) - 1);
+        pass_[sizeof(pass_) - 1] = '\0';
+        enabled_ = true;  // Автоматично увімкнути при наявності дефолтів
+        ESP_LOGW(TAG, "No MQTT pass in NVS — using bootstrap password");
+    }
+#endif
 }
 
 bool MqttService::save_config(const char* broker, uint16_t port,
