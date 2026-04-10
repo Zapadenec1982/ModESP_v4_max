@@ -357,10 +357,17 @@ esp_err_t HttpService::handle_post_bindings(httpd_req_t* req) {
     buf[total] = '\0';
 
     // Мінімальна валідація JSON: manifest_version + bindings array
+    // 256 токенів — достатньо для ~25 bindings (по ~10 токенів кожен)
+    // Це максимум для 2KB body; якщо недостатньо — збільшити buf теж
     jsmn_parser parser;
-    jsmntok_t tokens[160];  // ~15 bindings × ~10 tokens/binding + overhead
+    static constexpr int MAX_TOKENS = 256;
+    jsmntok_t tokens[MAX_TOKENS];
     jsmn_init(&parser);
-    int r = jsmn_parse(&parser, buf, total, tokens, 160);
+    int r = jsmn_parse(&parser, buf, total, tokens, MAX_TOKENS);
+    if (r == JSMN_ERROR_NOMEM) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Too many bindings");
+        return ESP_FAIL;
+    }
     if (r < 1 || tokens[0].type != JSMN_OBJECT) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
         return ESP_FAIL;
