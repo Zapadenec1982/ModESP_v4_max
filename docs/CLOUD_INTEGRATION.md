@@ -274,7 +274,67 @@ The MQTT client uses its own reconnection logic with exponential backoff, indepe
 
 Reconnects triggered by configuration changes (HTTP API, `_set_tenant`) are deferred to the main loop via `reconnect_requested_` flag to avoid race conditions with the httpd task.
 
-## 11. Home Assistant Auto-Discovery
+### HTTPS Bootstrap Fallback
+
+If MQTT disconnects 3 times consecutively without a successful connection in between (likely an authentication failure after reflash or credential mismatch), the firmware triggers a self-recovery sequence:
+
+1. After 3rd disconnect, `bootstrap_pending_` flag is set.
+2. On the next `on_update()` cycle, `try_https_bootstrap()` is called (deferred for stack safety).
+3. Firmware sends `POST https://{broker}/api/devices/register` with `device_id` and `bootstrap_key`.
+4. The cloud server validates the bootstrap key (timing-safe comparison) and resets the device's DB credentials to bootstrap hash. If the device was `active`, it is moved to `pending` status.
+5. On HTTP 200/201, firmware updates local credentials to bootstrap password, clears `tenant`/`prefix` from NVS, rebuilds default prefix (`modesp/v1/pending/{device_id}`), and triggers a reconnect.
+6. MQTT connects with bootstrap credentials → cloud detects device on `pending` topic → auto-assigns tenant via `checkStuckDevice()` → sends new unique credentials.
+
+The broker hostname for the HTTPS call is extracted from the configured `broker_` field (strips `mqtt://` or `mqtts://` scheme prefix).
+
+This mechanism requires `CONFIG_MODESP_MQTT_BOOTSTRAP_PASSWORD` to be set in Kconfig. Without it, the bootstrap fallback is a no-op.
+
+## 11. Factory Reset
+
+The firmware provides two levels of reset, accessible via the WebUI System page:
+
+### Reset Settings (`POST /api/factory-reset`)
+
+Erases business logic settings while preserving connectivity:
+
+| NVS Namespace | Content | Action |
+|---|---|---|
+| `persist` | Thermostat, defrost, protection, EEV settings | **Erased** |
+| `mqtt` (tenant, prefix) | Cloud tenant assignment | **Erased** |
+| `mqtt` (broker, user, pass, enabled) | MQTT connection credentials | Preserved |
+| `wifi` | SSID, password, AP config | Preserved |
+| `auth` | WebUI login credentials | Preserved |
+| `time` | Timezone, NTP | Preserved |
+
+After reboot: WiFi reconnects automatically, MQTT connects as `pending` (tenant cleared), cloud auto-reassigns device within ~2 minutes via `checkStuckDevice()`.
+
+### Full Factory Reset (`POST /api/factory-reset-full`)
+
+Erases the entire NVS partition (`nvs_flash_erase()`). Device reboots into AP mode with no credentials. Requires manual WiFi setup.
+
+If `CONFIG_MODESP_CLOUD_MQTT` Kconfig defaults are configured, the device will auto-populate MQTT credentials from firmware defaults after full reset:
+
+| Kconfig Option | Default | Description |
+|---|---|---|
+| `MODESP_MQTT_DEFAULT_BROKER` | `mqtts://modesp.com.ua` | Fallback broker URI |
+| `MODESP_MQTT_DEFAULT_PORT` | `8883` | Fallback broker port |
+| `MODESP_MQTT_BOOTSTRAP_PASSWORD` | (empty) | Shared bootstrap password |
+
+When NVS is empty, `load_config()` populates `broker_`, `port_`, and `pass_` from Kconfig. The username is generated from the WiFi SoftAP MAC: `device_{MAC[3]:MAC[4]:MAC[5]}` (hex, uppercase).
+
+### Recovery Scenarios
+
+| Scenario | Recovery Path | Time |
+|---|---|---|
+| Settings reset | WiFi preserved → MQTT pending → auto-reassign | ~2 min |
+| Full reset (with Kconfig defaults) | AP mode → manual WiFi → MQTT bootstrap → auto-reassign | Manual + ~2 min |
+| Full reset (no Kconfig defaults) | AP mode → manual WiFi + MQTT config | Fully manual |
+| Reflash (`idf.py erase-flash && flash`) | Same as full reset | Depends on Kconfig |
+| MQTT credential mismatch | Auto: 3 fails → HTTPS bootstrap → pending → auto-reassign | ~3 min |
+| Power outage / network loss | Credentials preserved → reconnect with existing creds | Immediate |
+| Device in warehouse for weeks | Credentials preserved → reconnect on power-up | Immediate |
+
+## 12. Home Assistant Auto-Discovery
 
 On every MQTT connect, the device publishes Home Assistant MQTT discovery messages for 22 entities:
 
@@ -289,7 +349,7 @@ Discovery topics follow the HA convention: `homeassistant/{type}/modesp_{device_
 
 Each entity includes availability tracking via the `{prefix}/status` topic (`online`/`offline`).
 
-## 12. HTTP Configuration API
+## 13. HTTP Configuration API
 
 The MQTT service registers local HTTP endpoints for configuration:
 
