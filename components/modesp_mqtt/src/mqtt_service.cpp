@@ -1353,7 +1353,6 @@ void MqttService::publish_ha_discovery() {
     for (int z = 0; z < zone_count && z < 4; z++) {
         char key[48];
         char name[64];
-        const char* zone_label = (zone_count > 1) ? "" : "";
 
         for (const auto& ze : ZONE_ENTITIES) {
             snprintf(key, sizeof(key), "%s.%s", thermo_ns[z], ze.suffix);
