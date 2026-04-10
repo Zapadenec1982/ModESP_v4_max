@@ -181,16 +181,6 @@ esp_err_t HttpService::handle_options(httpd_req_t* req) {
     return ESP_OK;
 }
 
-// Helper: read a file from LittleFS into buffer, return bytes read or -1
-static int read_file_to_buf(const char* path, char* buf, size_t buf_size) {
-    FILE* f = fopen(path, "r");
-    if (!f) return -1;
-    int len = (int)fread(buf, 1, buf_size - 1, f);
-    fclose(f);
-    if (len >= 0) buf[len] = '\0';
-    return len;
-}
-
 // Helper: stream a JSON file from LittleFS as chunked HTTP response (zero-copy, O(1) RAM)
 static esp_err_t serve_json_file_chunked(httpd_req_t* req, const char* path, const char* not_found_msg) {
     FILE* f = fopen(path, "r");
@@ -198,7 +188,7 @@ static esp_err_t serve_json_file_chunked(httpd_req_t* req, const char* path, con
         httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, not_found_msg);
         return ESP_FAIL;
     }
-    HttpService::set_cors_headers(req);
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_type(req, "application/json");
     char buf[512];
     size_t n;
