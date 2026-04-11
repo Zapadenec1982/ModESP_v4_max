@@ -188,7 +188,6 @@ static esp_err_t serve_json_file_chunked(httpd_req_t* req, const char* path, con
         httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, not_found_msg);
         return ESP_FAIL;
     }
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_type(req, "application/json");
     char buf[512];
     size_t n;
@@ -1705,7 +1704,7 @@ void HttpService::register_api_handlers() {
                 break;
             }
         }
-        if (!already && options_count < 16) {
+        if (!already && options_count < 26) {
             httpd_uri_t options = {};
             options.uri      = ep.uri;
             options.method   = HTTP_OPTIONS;
