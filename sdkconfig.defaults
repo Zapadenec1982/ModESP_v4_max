@@ -9,11 +9,10 @@ CONFIG_MODESP_MODBUS_ENABLED=y
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 CONFIG_APP_ROLLBACK_ENABLE=y
 
-# Main task stack: 16KB needed for 18+ modules updating sequentially on same stack.
-# Each module's on_update() + SharedState reads (StateKey<32> + Optional<StateValue>)
-# + ESP_LOG formatting + FreeRTOS mutex ops + Xtensa interrupt context.
-# 8KB was insufficient — caused stack overflow crash in DataLogger (last module).
-CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+# Main task stack: 12KB for 18+ modules updating sequentially on same stack.
+# 8KB was insufficient — stack overflow crash in DataLogger (last module).
+# system.stack_hwm monitors actual usage at runtime.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=12288
 
 # Custom partition table (NVS 16K + otadata 8K + phy 4K + ota_0 1.5MB + ota_1 1.5MB + SPIFFS 960K)
 CONFIG_PARTITION_TABLE_CUSTOM=y
