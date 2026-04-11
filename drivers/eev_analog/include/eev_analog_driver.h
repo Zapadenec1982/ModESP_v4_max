@@ -15,6 +15,9 @@
 
 #include "modesp/hal/driver_interfaces.h"
 #include "esp_err.h"
+#ifndef HOST_BUILD
+#include "driver/dac_oneshot.h"
+#endif
 
 namespace modesp {
 

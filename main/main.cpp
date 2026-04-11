@@ -501,7 +501,7 @@ extern "C" void app_main(void)
             }
         }
 
-        // 4. Uptime + heap diagnostics in SharedState (once per second)
+        // 4. Uptime + heap + stack diagnostics in SharedState (once per second)
         static uint32_t sec_counter = 0;
         sec_counter += dt_ms;
         if (sec_counter >= 1000) {
@@ -512,6 +512,15 @@ extern "C" void app_main(void)
             size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
             app.state().set("system.heap_largest",
                             static_cast<int32_t>(largest), false);
+
+            // Stack high-water-mark: мінімальний залишок з моменту старту
+            UBaseType_t hwm = uxTaskGetStackHighWaterMark(nullptr);
+            uint32_t hwm_bytes = hwm * sizeof(StackType_t);
+            app.state().set("system.stack_hwm",
+                            static_cast<int32_t>(hwm_bytes), false);
+            if (hwm_bytes < 1024) {
+                ESP_LOGE(TAG, "MAIN STACK LOW: %lu bytes remaining!", (unsigned long)hwm_bytes);
+            }
         }
 
         // 5. HW watchdog reset
