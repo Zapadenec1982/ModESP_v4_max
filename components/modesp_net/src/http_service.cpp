@@ -306,7 +306,8 @@ esp_err_t HttpService::handle_get_bindings(httpd_req_t* req) {
 esp_err_t HttpService::handle_post_bindings(httpd_req_t* req) {
     if (!check_auth(req)) return ESP_OK;
     // Приймаємо JSON body — bindings.json до ~4KB з 20+ bindings
-    char buf[4096];
+    // static: httpd обробляє один запит за раз, безпечно для однопотокового handler
+    static char buf[4096];
     int total = 0;
     int remaining = req->content_len;
     if (remaining <= 0 || remaining >= (int)sizeof(buf)) {
@@ -332,7 +333,7 @@ esp_err_t HttpService::handle_post_bindings(httpd_req_t* req) {
     // Це максимум для 2KB body; якщо недостатньо — збільшити buf теж
     jsmn_parser parser;
     static constexpr int MAX_TOKENS = 256;
-    jsmntok_t tokens[MAX_TOKENS];
+    static jsmntok_t tokens[MAX_TOKENS];
     jsmn_init(&parser);
     int r = jsmn_parse(&parser, buf, total, tokens, MAX_TOKENS);
     if (r == JSMN_ERROR_NOMEM) {
