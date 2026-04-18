@@ -12,7 +12,14 @@ namespace modesp {
 
 LoggerService::LoggerService()
     : BaseModule("logger", ModulePriority::LOW)
-{}
+{
+    mutex_ = xSemaphoreCreateMutex();
+    configASSERT(mutex_ != nullptr);
+}
+
+LoggerService::~LoggerService() {
+    if (mutex_) vSemaphoreDelete(mutex_);
+}
 
 bool LoggerService::on_init() {
     state_set("logger.count", static_cast<int32_t>(0));
@@ -30,12 +37,10 @@ void LoggerService::on_stop() {
 }
 
 void LoggerService::log(LogLevel level, const char* source, const char* message) {
-    // Фільтр мінімального рівня
+    // Фільтр мінімального рівня (без mutex — read-only члена)
     if (level < min_level) return;
 
-    total_logged_++;
-
-    // Дублюємо в ESP-IDF лог
+    // ESP_LOG поза mutex — щоб не блокувати логер при контенції
     switch (level) {
         case LogLevel::DEBUG:
             ESP_LOGD(source, "%s", message);
@@ -54,19 +59,27 @@ void LoggerService::log(LogLevel level, const char* source, const char* message)
             break;
     }
 
-    // Зберігаємо в circular buffer (O(1), автоматично перезаписує найстаріший)
-    LogEntry entry;
-    entry.timestamp_ms = uptime_ms_;
-    entry.level = level;
-    entry.source = source;
-    entry.message = message;
+    // Критична секція: push в circular buffer + інкремент total_logged_
+    uint32_t new_total = 0;
+    if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(100)) == pdTRUE) {
+        total_logged_++;
+        new_total = total_logged_;
 
-    entries_.push(entry);
+        LogEntry entry;
+        entry.timestamp_ms = uptime_ms_;
+        entry.level = level;
+        entry.source = source;
+        entry.message = message;
+        entries_.push(entry);
+        xSemaphoreGive(mutex_);
+    } else {
+        ESP_LOGE("LoggerSvc", "Mutex timeout in log() — entry lost");
+        return;
+    }
 
-    // Оновлюємо SharedState
-    state_set("logger.count", static_cast<int32_t>(total_logged_));
+    // SharedState + bus publish ПОЗА mutex
+    state_set("logger.count", static_cast<int32_t>(new_total));
 
-    // Публікація на шину (якщо увімкнено)
     if (publish_to_bus) {
         MsgLogEntry msg;
         msg.level = level;
@@ -77,16 +90,25 @@ void LoggerService::log(LogLevel level, const char* source, const char* message)
 }
 
 void LoggerService::read_recent(size_t count, EntryCallback cb, void* user_data) const {
-    if (entries_.empty()) return;
+    if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(100)) != pdTRUE) return;
 
-    size_t start = 0;
-    if (entries_.size() > count) {
-        start = entries_.size() - count;
+    if (!entries_.empty()) {
+        size_t start = 0;
+        if (entries_.size() > count) {
+            start = entries_.size() - count;
+        }
+        for (size_t i = start; i < entries_.size(); i++) {
+            cb(entries_[i], user_data);
+        }
     }
+    xSemaphoreGive(mutex_);
+}
 
-    for (size_t i = start; i < entries_.size(); i++) {
-        cb(entries_[i], user_data);
-    }
+size_t LoggerService::entry_count() const {
+    if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(100)) != pdTRUE) return 0;
+    size_t s = entries_.size();
+    xSemaphoreGive(mutex_);
+    return s;
 }
 
 } // namespace modesp

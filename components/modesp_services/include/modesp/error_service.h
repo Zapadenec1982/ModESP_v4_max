@@ -17,6 +17,8 @@
 #include "modesp/base_module.h"
 #include "modesp/service_messages.h"
 #include "etl/circular_buffer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 namespace modesp {
 
@@ -27,6 +29,7 @@ namespace modesp {
 class ErrorService : public BaseModule {
 public:
     ErrorService();
+    ~ErrorService();
 
     // ── BaseModule lifecycle ──
     bool on_init() override;
@@ -42,10 +45,9 @@ public:
     size_t error_count() const { return total_errors_; }
     bool is_safe_mode() const { return safe_mode_; }
 
-    // ── Історія (для діагностики) ──
-    const etl::circular_buffer<ErrorRecord, MODESP_MAX_ERROR_HISTORY>& history() const {
-        return history_;
-    }
+    // ── Thread-safe ітерація по історії (для HTTP handlers з іншого task) ──
+    using HistoryCallback = void(*)(const ErrorRecord&, void* user_data);
+    void for_each_history(HistoryCallback cb, void* user_data) const;
 
 private:
     void enter_safe_mode(const char* reason);
@@ -54,6 +56,7 @@ private:
     uint32_t total_errors_ = 0;
     bool safe_mode_ = false;
     uint32_t uptime_ms_ = 0;
+    mutable SemaphoreHandle_t mutex_ = nullptr;
 };
 
 } // namespace modesp

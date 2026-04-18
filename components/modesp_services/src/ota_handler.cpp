@@ -34,6 +34,10 @@ static std::atomic<bool> s_ota_in_progress{false};
 // SharedState для публікації статусу (встановлюється перед запуском task)
 static SharedState* s_state = nullptr;
 
+// Pre-restart hook (BUG-014): flush NVS перед reboot
+static PreRestartFn s_pre_restart_cb = nullptr;
+static void* s_pre_restart_ud = nullptr;
+
 // Статичний буфер параметрів (безпечно: atomic flag блокує повторний запуск)
 static OtaParams s_task_params;
 
@@ -331,6 +335,13 @@ static void ota_task(void* arg) {
     set_status("rebooting");
     set_progress(100);
 
+    // BUG-014: flush dirty NVS ключі перед reboot
+    // (без цього втрачаються незбережені setpoint/defrost interval при OTA)
+    if (s_pre_restart_cb) {
+        ESP_LOGI(TAG, "Flushing pending NVS writes before restart...");
+        s_pre_restart_cb(s_pre_restart_ud);
+    }
+
     // Даємо час для публікації статусу через MQTT/WS
     vTaskDelay(pdMS_TO_TICKS(2000));
     esp_restart();
@@ -374,6 +385,11 @@ bool start_ota(const OtaParams& params, SharedState* state) {
 
 bool is_in_progress() {
     return s_ota_in_progress.load();
+}
+
+void set_pre_restart_hook(PreRestartFn cb, void* user_data) {
+    s_pre_restart_cb = cb;
+    s_pre_restart_ud = user_data;
 }
 
 } // namespace ota_handler
