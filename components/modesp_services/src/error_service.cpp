@@ -13,7 +13,14 @@ namespace modesp {
 
 ErrorService::ErrorService()
     : BaseModule("error", ModulePriority::CRITICAL)
-{}
+{
+    mutex_ = xSemaphoreCreateMutex();
+    configASSERT(mutex_ != nullptr);
+}
+
+ErrorService::~ErrorService() {
+    if (mutex_) vSemaphoreDelete(mutex_);
+}
 
 bool ErrorService::on_init() {
     state_set("error.count", static_cast<int32_t>(0));
@@ -42,9 +49,7 @@ void ErrorService::on_stop() {
 
 void ErrorService::report(const char* source, int32_t code,
                           ErrorSeverity severity, const char* description) {
-    total_errors_++;
-
-    // Логуємо в ESP-IDF лог
+    // ESP_LOG поза mutex — щоб не блокувати логер при контенції
     switch (severity) {
         case ErrorSeverity::INFO:
             ESP_LOGI(TAG, "[%s] code=%ld: %s", source, code, description);
@@ -63,20 +68,34 @@ void ErrorService::report(const char* source, int32_t code,
             break;
     }
 
-    // Зберігаємо в circular buffer (O(1), автоматично перезаписує найстаріший)
-    ErrorRecord record;
-    record.timestamp_ms = uptime_ms_;
-    record.source = source;
-    record.code = code;
-    record.severity = severity;
-    record.description = description;
+    // Критична секція: push в circular buffer + інкремент total_errors_
+    // (захищає від race з for_each_history() з HTTP/WS task)
+    uint32_t new_total = 0;
+    bool trigger_safe_mode = false;
+    if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(100)) == pdTRUE) {
+        total_errors_++;
+        new_total = total_errors_;
 
-    history_.push(record);
+        ErrorRecord record;
+        record.timestamp_ms = uptime_ms_;
+        record.source = source;
+        record.code = code;
+        record.severity = severity;
+        record.description = description;
+        history_.push(record);
 
-    // Оновлюємо SharedState
-    state_set("error.count", static_cast<int32_t>(total_errors_));
+        if (severity == ErrorSeverity::FATAL && !safe_mode_) {
+            trigger_safe_mode = true;
+        }
+        xSemaphoreGive(mutex_);
+    } else {
+        ESP_LOGE(TAG, "Mutex timeout in report() — record lost");
+        return;
+    }
 
-    // Публікуємо повідомлення на шину (WARNING і вище)
+    // Публікуємо state/повідомлення ПОЗА mutex (щоб уникнути deadlock з SharedState)
+    state_set("error.count", static_cast<int32_t>(new_total));
+
     if (severity >= ErrorSeverity::WARNING) {
         MsgSystemError err_msg;
         err_msg.source = source;
@@ -86,10 +105,17 @@ void ErrorService::report(const char* source, int32_t code,
         publish(err_msg);
     }
 
-    // FATAL → Safe Mode
-    if (severity == ErrorSeverity::FATAL && !safe_mode_) {
+    if (trigger_safe_mode) {
         enter_safe_mode(description);
     }
+}
+
+void ErrorService::for_each_history(HistoryCallback cb, void* user_data) const {
+    if (xSemaphoreTake(mutex_, pdMS_TO_TICKS(100)) != pdTRUE) return;
+    for (const auto& r : history_) {
+        cb(r, user_data);
+    }
+    xSemaphoreGive(mutex_);
 }
 
 void ErrorService::enter_safe_mode(const char* reason) {
