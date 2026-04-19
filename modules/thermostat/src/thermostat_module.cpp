@@ -598,18 +598,11 @@ void ThermostatModule::publish_outputs() {
 // ═══════════════════════════════════════════════════════════════
 
 void ThermostatModule::on_message(const etl::imessage& msg) {
-    // Setpoint change (від WebSocket, config тощо)
-    if (msg.get_message_id() == modesp::msg_id::SETPOINT_CHANGED) {
-        const auto& sp_msg = static_cast<const modesp::MsgSetpointChanged&>(msg);
-        if (sp_msg.target == "thermostat") {
-            setpoint_ = sp_msg.value;
-            state_set(ns_key("setpoint"), setpoint_);
-            ESP_LOGI(TAG, "Setpoint changed: %.1f°C", setpoint_);
-        }
-        return;
-    }
+    // Setpoint змінюється через SharedState (HTTP/MQTT → state.set() →
+    // sync_settings() підтягує у наступному on_update). MsgSetpointChanged
+    // видалено як надлишковий — див. docs/13_message_bus.md.
 
-    // Safe Mode: аварійна зупинка через message bus
+    // Safe Mode: аварійна зупинка через message bus (broadcast fan-out event)
     if (msg.get_message_id() == modesp::msg_id::SYSTEM_SAFE_MODE) {
         request_compressor(false);
         request_evap_fan(false);

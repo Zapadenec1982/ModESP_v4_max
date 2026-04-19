@@ -137,13 +137,17 @@ drivers/ds18b20/include/
     ds18b20_driver.h      ← клас драйвера
     ds18b20_messages.h    ← MsgSensorReading для цього драйвера
 
-modules/thermostat/include/
-    thermostat_module.h
-    thermostat_messages.h  ← MsgSetpointChanged
+modules/protection/include/
+    protection_module.h
+    protection_messages.h ← MsgAlarmTriggered (transient event, fan-out)
 ```
 
 Інший модуль підключає тільки потрібні заголовки.
 Ніякого центрального файлу "all_messages.h".
+
+**Перед додаванням нового message type** — перевір decision flow у
+`docs/13_message_bus.md`. Більшість «змін» це насправді persistent state,
+що належить SharedState, а не event bus.
 
 ## 4. Shutdown
 
