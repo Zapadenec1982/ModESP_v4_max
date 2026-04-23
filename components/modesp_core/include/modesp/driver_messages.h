@@ -51,11 +51,13 @@ struct MsgActuatorFeedback : etl::message<msg_id::ACTUATOR_FEEDBACK> {
 // ═══════════════════════════════════════════════════════════════
 // Module messages (150+)
 // ═══════════════════════════════════════════════════════════════
-
-/// Зміна уставки (від WebSocket, конфігурації)
-struct MsgSetpointChanged : etl::message<msg_id::SETPOINT_CHANGED> {
-    etl::string<16> target;       // "thermostat", "alarm"
-    float value;
-};
+//
+// MsgSetpointChanged видалено — setpoint це persistent state, не event.
+// HTTP/MQTT/config пишуть напряму у SharedState, модулі polling-ують
+// через sync_settings() у on_update(). Див. docs/13_message_bus.md.
+//
+// Доменні events для модулів додавати тут за потреби (alarm aggregation,
+// defrost lifecycle тощо). Перед додаванням — перевірити decision flow
+// у docs/13_message_bus.md: чи це справді event, чи краще state+polling.
 
 } // namespace modesp

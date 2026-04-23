@@ -29,8 +29,14 @@ namespace modesp {
 #define MODESP_MAX_MODULES 24
 #endif
 
+// Кількість роутерів на message bus.
+// Реальне використання: 3-4 модулі (Equipment, Thermostat, ErrorService)
+// слухають доменні події (SAFE_MODE, MODULE_TIMEOUT). Решта модулів
+// користуються polling SharedState через sync_settings() / read_input_*.
+// 8 — двократний запас для майбутніх event-handlers (alarm aggregation,
+// OTA progress streaming). Див. docs/13_message_bus.md
 #ifndef MODESP_MAX_BUS_ROUTERS
-#define MODESP_MAX_BUS_ROUTERS 24
+#define MODESP_MAX_BUS_ROUTERS 8
 #endif
 
 // ═══════════════════════════════════════════════════════════════

@@ -124,7 +124,8 @@ namespace msg_id {
     // ── Модулі ──
     constexpr etl::message_id_t ALARM_TRIGGERED    = 150;
     constexpr etl::message_id_t ALARM_CLEARED      = 151;
-    constexpr etl::message_id_t SETPOINT_CHANGED   = 160;
+    // 160 (SETPOINT_CHANGED) видалено — setpoint це persistent state,
+    // не event. Див. docs/13_message_bus.md.
     constexpr etl::message_id_t DEFROST_START      = 170;
     constexpr etl::message_id_t DEFROST_END        = 171;
 } // namespace msg_id

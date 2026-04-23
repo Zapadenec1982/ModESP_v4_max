@@ -44,5 +44,13 @@ bool start_ota(const OtaParams& params, SharedState* state);
  */
 bool is_in_progress();
 
+/// Pre-restart callback — фіналізація перед esp_restart() (flush NVS тощо).
+/// Викликається всередині OTA task після успішного flash, перед reboot.
+using PreRestartFn = void(*)(void* user_data);
+
+/// Зареєструвати pre-restart hook. Викликається один раз з main.cpp.
+/// PersistService::flush_now() зберігає dirty NVS ключі перед reboot.
+void set_pre_restart_hook(PreRestartFn cb, void* user_data);
+
 } // namespace ota_handler
 } // namespace modesp

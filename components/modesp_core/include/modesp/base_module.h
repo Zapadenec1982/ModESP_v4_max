@@ -86,7 +86,19 @@ public:
 protected:
     // ── API для модулів (доступний після реєстрації) ──
     
-    // Відправити повідомлення на шину (всім підписникам)
+    /// Відправити повідомлення на шину (broadcast усім підписникам).
+    ///
+    /// ВИКОРИСТОВУЙ ЛИШЕ для:
+    ///   1. Transient signals без state representation (alarm fired, watchdog timeout)
+    ///   2. Broadcast fan-out де ≥2 модулі мають реагувати синхронно (SAFE_MODE)
+    ///   3. Discrete events частотою <1Hz (defrost lifecycle markers)
+    ///
+    /// НЕ ВИКОРИСТОВУЙ для:
+    ///   - State updates (setpoint, mode, FSM state) → SharedState + sync_settings()
+    ///   - High-frequency data (sensor readings) → SharedState
+    ///   - Request-response 1→1 → прямий method call або InputBinding
+    ///
+    /// Повна документація: docs/13_message_bus.md
     void publish(const etl::imessage& msg);
 
     // Записати значення в SharedState

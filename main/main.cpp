@@ -30,6 +30,7 @@
 // Phase 4: Configuration + HAL + Persist
 #include "modesp/services/config_service.h"
 #include "modesp/services/persist_service.h"
+#include "modesp/services/ota_handler.h"
 #include "modesp/hal/hal.h"
 #include "modesp/hal/driver_manager.h"
 
@@ -301,6 +302,12 @@ extern "C" void app_main(void)
     // Повинен ініціалізуватися ДО бізнес-модулів (Phase 2)
     persist_service.set_state(&app.state());
     app.modules().register_module(persist_service);
+
+    // BUG-014: flush dirty NVS перед reboot в OTA task.
+    // Без цього втрачаються незбережені setpoint/defrost interval після cloud OTA.
+    modesp::ota_handler::set_pre_restart_hook(
+        [](void* ud) { static_cast<modesp::PersistService*>(ud)->flush_now(); },
+        &persist_service);
 
     app.modules().register_module(system_monitor);
 
