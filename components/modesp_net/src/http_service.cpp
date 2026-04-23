@@ -17,10 +17,12 @@
 #include <cmath>
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_heap_caps.h"
 #include "nvs_flash.h"
 #include "esp_mac.h"
 #include "esp_ota_ops.h"
 #include "esp_app_format.h"
+#include "esp_app_desc.h"
 #include "esp_sntp.h"
 #include "esp_timer.h"
 #include "modesp/services/nvs_helper.h"
@@ -305,9 +307,9 @@ esp_err_t HttpService::handle_get_bindings(httpd_req_t* req) {
 
 esp_err_t HttpService::handle_post_bindings(httpd_req_t* req) {
     if (!check_auth(req)) return ESP_OK;
-    // Приймаємо JSON body — bindings.json до ~4KB з 20+ bindings
+    // Phase 1.3: бінди реально <1KB (dev=541B, kc868a6=849B). 2KB — запас 2×.
     // static: httpd обробляє один запит за раз, безпечно для однопотокового handler
-    static char buf[4096];
+    static char buf[2048];
     int total = 0;
     int remaining = req->content_len;
     if (remaining <= 0 || remaining >= (int)sizeof(buf)) {
@@ -1649,6 +1651,99 @@ esp_err_t HttpService::handle_post_auth(httpd_req_t* req) {
     return ESP_OK;
 }
 
+// ── System diagnostics ───────────────────────────────────────────
+//
+// Phase 0 baseline endpoint. Returns a focused JSON snapshot of RAM,
+// PSRAM і stack HWM для відомих задач. Не дублює /api/state — цей
+// endpoint агрегує власні heap_caps_* виклики (включно з PSRAM,
+// мінімум якого SystemMonitor не відстежує) одним запитом.
+//
+// Споживачі: reliability gates (Phase 1..6), CI soak-скрипти,
+// WebUI Diagnostics панель.
+esp_err_t HttpService::handle_get_system_diagnostics(httpd_req_t* req) {
+    auto* self = static_cast<HttpService*>(req->user_ctx);
+
+    // Internal SRAM (DRAM)
+    uint32_t dram_free    = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    uint32_t dram_largest = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    uint32_t dram_min     = (uint32_t)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    uint32_t dram_total   = (uint32_t)heap_caps_get_total_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+
+    // PSRAM (external SPI RAM) — 0 if absent
+    uint32_t psram_free    = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    uint32_t psram_largest = (uint32_t)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+    uint32_t psram_total   = (uint32_t)heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+
+    // Task stack high-water marks (name-based lookup — same list
+    // що SystemMonitor логує у UART кожні 30с)
+    struct TaskHwm { const char* name; uint32_t hwm_bytes; };
+    static const char* task_names[] = {"main", "ota_http", "httpd", "mqtt", "modbus"};
+    TaskHwm hwms[sizeof(task_names) / sizeof(task_names[0])] = {};
+    int hwm_count = 0;
+    for (const char* name : task_names) {
+        TaskHandle_t h = xTaskGetHandle(name);
+        if (h) {
+            UBaseType_t hwm = uxTaskGetStackHighWaterMark(h);
+            hwms[hwm_count++] = { name, (uint32_t)(hwm * sizeof(StackType_t)) };
+        }
+    }
+
+    // Uptime + firmware identification (з SharedState, якщо існує)
+    uint32_t uptime_sec = 0;
+    if (self->state_) {
+        auto v = self->state_->get("system.uptime");
+        if (v.has_value()) {
+            const auto* iv = etl::get_if<int32_t>(&v.value());
+            if (iv) uptime_sec = (uint32_t)(*iv);
+        }
+    }
+    const esp_app_desc_t* desc = esp_app_get_description();
+    const esp_partition_t* running = esp_ota_get_running_partition();
+
+    // Module count (для sanity check — скільки модулів зареєстровано)
+    size_t modules = 0;
+    if (self->modules_) {
+        modules = self->modules_->module_count();
+    }
+
+    // Формуємо JSON. 512 байт достатньо з запасом — реально ~380 байт.
+    char buf[512];
+    int pos = snprintf(buf, sizeof(buf),
+        "{"
+        "\"firmware\":{\"version\":\"%s\",\"partition\":\"%s\",\"idf\":\"%s\"},"
+        "\"uptime_sec\":%lu,"
+        "\"modules\":%u,"
+        "\"dram\":{\"free\":%lu,\"largest\":%lu,\"min_free\":%lu,\"total\":%lu},"
+        "\"psram\":{\"free\":%lu,\"largest\":%lu,\"total\":%lu},"
+        "\"tasks\":{",
+        desc ? desc->version : "?",
+        running ? running->label : "?",
+        desc ? desc->idf_ver : "?",
+        (unsigned long)uptime_sec,
+        (unsigned)modules,
+        (unsigned long)dram_free,  (unsigned long)dram_largest,
+        (unsigned long)dram_min,   (unsigned long)dram_total,
+        (unsigned long)psram_free, (unsigned long)psram_largest,
+        (unsigned long)psram_total);
+
+    for (int i = 0; i < hwm_count && pos < (int)sizeof(buf); i++) {
+        pos += snprintf(buf + pos, sizeof(buf) - pos,
+                        "%s\"%s\":%lu",
+                        (i == 0 ? "" : ","),
+                        hwms[i].name,
+                        (unsigned long)hwms[i].hwm_bytes);
+    }
+
+    if (pos < (int)sizeof(buf)) {
+        pos += snprintf(buf + pos, sizeof(buf) - pos, "}}");
+    }
+
+    set_cors_headers(req);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, buf, (ssize_t)pos);
+    return ESP_OK;
+}
+
 // ── Server setup ────────────────────────────────────────────────
 
 void HttpService::register_api_handlers() {
@@ -1682,6 +1777,7 @@ void HttpService::register_api_handlers() {
         {"/api/log/summary", HTTP_GET, handle_get_log_summary},
         {"/api/auth", HTTP_GET,  handle_get_auth},
         {"/api/auth", HTTP_POST, handle_post_auth},
+        {"/api/system/diagnostics", HTTP_GET, handle_get_system_diagnostics},
     };
 
     // Реєструємо handlers + OPTIONS для CORS preflight
@@ -1743,7 +1839,7 @@ void HttpService::register_static_handler() {
 bool HttpService::start_server() {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
-    config.max_uri_handlers = 56;  // 24 EP + 20 OPTIONS + OTA + WS + MQTT(3) + Modbus(3) + static = 53
+    config.max_uri_handlers = 60;  // 25 EP + 21 OPTIONS + OTA + WS + MQTT(3) + Modbus(3) + static = 55 (Phase 0: +diagnostics)
     config.max_open_sockets = 4;   // 3 WS + 1 HTTP; lwIP 10 total (1 listener + 4 sess + 1 MQTT = 6)
     config.stack_size = 8192;
 

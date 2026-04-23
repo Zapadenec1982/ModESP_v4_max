@@ -9,6 +9,7 @@
 #include "modesp/services/config_service.h"
 #include "esp_log.h"
 #include "esp_littlefs.h"
+#include "esp_heap_caps.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -18,12 +19,45 @@
 
 static const char TAG[] = "ConfigSvc";
 
-// Спільний parse-буфер для board.json і bindings.json (boot-only, sequential calls)
-// Один набір замість двох static local — економія ~8 KB BSS
+// Phase 1.2: parse-буфери на heap (alloc у on_init, free перед return).
+// Раніше були static (4 KB + 350×16 = ~9.6 KB BSS retained forever).
+// Boot-only використання → heap allocation правильний за докою (docs/04)
+// і звільнюється одразу після парсингу. Зберігаємо вказівники у namespace-local
+// щоб parse_board_json / parse_bindings_json мали до них доступ без передачі
+// параметрами (мінімальний diff proximally до існуючого коду).
+//
+// Інваріант: парс-функції ПОВИННІ викликатись ТІЛЬКИ з on_init() між
+// allocate_parse_buffers() / free_parse_buffers(). Null-check у парсері
+// ловить порушення.
 namespace {
-// ⚠️ Буфери ПОВИННІ збігатись з ConfigService::MAX_JSON_SIZE (4096) і MAX_TOKENS (350)!
-static char s_json_buf[4096];
-static jsmntok_t s_json_tokens[350];
+// Локальні копії limits — constants у класі приватні. Якщо зміняться у header,
+// compile-time assert нижче зловить mismatch.
+static constexpr size_t LOCAL_MAX_JSON_SIZE = 4096;
+static constexpr size_t LOCAL_MAX_TOKENS    = 350;
+
+static char*      s_json_buf    = nullptr;
+static jsmntok_t* s_json_tokens = nullptr;
+
+static bool allocate_parse_buffers() {
+    s_json_buf = static_cast<char*>(
+        heap_caps_malloc(LOCAL_MAX_JSON_SIZE,
+                         MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    s_json_tokens = static_cast<jsmntok_t*>(
+        heap_caps_malloc(LOCAL_MAX_TOKENS * sizeof(jsmntok_t),
+                         MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    if (!s_json_buf || !s_json_tokens) {
+        ESP_LOGE(TAG, "Parse buffer alloc failed (need ~9.6 KB free heap)");
+        if (s_json_buf)    { heap_caps_free(s_json_buf);    s_json_buf = nullptr; }
+        if (s_json_tokens) { heap_caps_free(s_json_tokens); s_json_tokens = nullptr; }
+        return false;
+    }
+    return true;
+}
+
+static void free_parse_buffers() {
+    if (s_json_buf)    { heap_caps_free(s_json_buf);    s_json_buf = nullptr; }
+    if (s_json_tokens) { heap_caps_free(s_json_tokens); s_json_tokens = nullptr; }
+}
 }  // namespace
 
 namespace modesp {
@@ -84,20 +118,39 @@ static int skip_token(const jsmntok_t* tokens, int idx, int ntokens) {
 // ═══════════════════════════════════════════════════════════════
 
 bool ConfigService::on_init() {
+    // Compile-time: локальні limits у anon namespace мають збігатися з приватними.
+    static_assert(LOCAL_MAX_JSON_SIZE == MAX_JSON_SIZE,
+                  "LOCAL_MAX_JSON_SIZE must match class MAX_JSON_SIZE");
+    static_assert(LOCAL_MAX_TOKENS == MAX_TOKENS,
+                  "LOCAL_MAX_TOKENS must match class MAX_TOKENS");
+
     if (!mount_littlefs()) {
         ESP_LOGE(TAG, "LittleFS mount failed");
         return false;
     }
 
-    if (!parse_board_json()) {
-        ESP_LOGE(TAG, "Failed to parse board.json");
+    // Phase 1.2: парс-буфери на heap тільки на час on_init (~9.6 KB).
+    if (!allocate_parse_buffers()) {
         return false;
     }
 
-    if (!parse_bindings_json()) {
-        ESP_LOGE(TAG, "Failed to parse bindings.json");
+    bool ok = parse_board_json();
+    if (!ok) {
+        ESP_LOGE(TAG, "Failed to parse board.json");
+        free_parse_buffers();
         return false;
     }
+
+    ok = parse_bindings_json();
+    if (!ok) {
+        ESP_LOGE(TAG, "Failed to parse bindings.json");
+        free_parse_buffers();
+        return false;
+    }
+
+    // Парс завершено — звільняємо ~9.6 KB heap. Подальше читання config
+    // йде через board_config_ / binding_table_ (зкопійовані ETL-контейнери).
+    free_parse_buffers();
 
     ESP_LOGI(TAG, "Board: %s v%s (%d gpio_out, %d ow, %d gpio_in, %d adc, %d i2c_bus, %d i2c_exp)",
              board_config_.board_name.c_str(),

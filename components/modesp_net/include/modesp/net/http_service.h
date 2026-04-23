@@ -18,6 +18,7 @@
  *   POST /api/restart  — restart ESP32
  *   POST /api/factory-reset      — reset settings + MQTT to pending (keeps WiFi/MQTT creds)
  *   POST /api/factory-reset-full — erase ALL NVS + restart (full factory defaults)
+ *   GET  /api/system/diagnostics — RAM/PSRAM/task HWM baseline snapshot (Phase 0)
  *   GET  /[path]       — static files from LittleFS /data/www/
  */
 
@@ -107,6 +108,7 @@ private:
     static esp_err_t handle_get_log_summary(httpd_req_t* req);
     static esp_err_t handle_get_auth(httpd_req_t* req);
     static esp_err_t handle_post_auth(httpd_req_t* req);
+    static esp_err_t handle_get_system_diagnostics(httpd_req_t* req);
     static esp_err_t handle_static(httpd_req_t* req);
 
     // CORS

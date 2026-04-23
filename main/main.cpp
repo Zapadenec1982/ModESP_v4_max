@@ -238,6 +238,11 @@ extern "C" void app_main(void)
     ESP_LOGI(TAG, "  WiFi + HTTP API + WebSocket");
     ESP_LOGI(TAG, "======================================");
 
+    // Phase 0 baseline: internal SRAM snapshot BEFORE any allocation/init.
+    // Дає фіксовану точку для порівняння з post-init та post-optimization.
+    ESP_LOGI(TAG, "── Heap baseline (pre-init) ──");
+    heap_caps_print_heap_info(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+
     // ── Step 0: NVS init (before everything) ──
     modesp::nvs_helper::init();
 
@@ -443,6 +448,23 @@ extern "C" void app_main(void)
     // ── Step 10: Main loop ──
     ESP_LOGI(TAG, "Registered %d modules total", (int)app.modules().module_count());
     ESP_LOGI(TAG, "Free heap after init: %lu bytes", esp_get_free_heap_size());
+
+    // Phase 0 baseline: post-init snapshot. Різниця з pre-init показує,
+    // скільки RAM витрачено на boot (модулі + WiFi + HTTP + MQTT).
+    // Також вилов free-block фрагментації: largest_free_block < free_size * 0.5
+    // = sign of heavy fragmentation.
+    ESP_LOGI(TAG, "── Heap baseline (post-init) ──");
+    heap_caps_print_heap_info(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    {
+        uint32_t spiram_free = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+        uint32_t spiram_tot  = (uint32_t)heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+        if (spiram_tot > 0) {
+            ESP_LOGI(TAG, "PSRAM: %lu / %lu bytes free",
+                     (unsigned long)spiram_free, (unsigned long)spiram_tot);
+        } else {
+            ESP_LOGI(TAG, "PSRAM: not present");
+        }
+    }
 
     // HW Watchdog — ESP-IDF v5.x auto-ініціалізує TWDT, тому reconfigure
     bool wdt_subscribed = false;

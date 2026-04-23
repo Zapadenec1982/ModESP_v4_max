@@ -36,6 +36,13 @@ CONFIG_MBEDTLS_TLS_CLIENT_ONLY=y
 # Tier 2: Reduce TLS output buffer (MQTT payloads < 600B, 2KB sufficient)
 CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=2048
 
+# Tier 2 (Phase 1.1 plan): Reduce TLS input buffer ceiling (default 16384).
+# DYNAMIC_BUFFER allocates up to this on each recv — shrinking cuts peak RX usage.
+# 8192 safe з усіма брокерами (HiveMQ/AWS/Mosquitto cert chains < 6KB, MQTT
+# PUBLISH payloads < 2KB у цьому проекті). Step B→4096 — тільки після 24h
+# broker-matrix soak (див. план Phase 1.1).
+CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=8192
+
 # Tier 2: Common CA bundle (~42 CAs) instead of Full (~200 CAs)
 # Covers HiveMQ Cloud, AWS IoT, Let's Encrypt, DigiCert, GlobalSign
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN=y
