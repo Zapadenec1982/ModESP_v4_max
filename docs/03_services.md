@@ -105,6 +105,11 @@ Runtime:
 `i2c_buses`, `i2c_expanders`, `expander_outputs`, `expander_inputs` (підтримка KC868-A6 та інших I2C плат).
 Кожен Binding включає: `role`, `driver`, `module`, `output`/`bus`/`input`/`channel`, `address` (опційно).
 
+**Heap-based parse buffers:** parse buffer (4096 B) + jsmn tokens (350 × 16 B = 5.6 KB) =
+~9.6 KB алокуються через `heap_caps_malloc(MALLOC_CAP_INTERNAL)` на початку `on_init()` та
+звільняються перед return. BSS не тримає ці буфери назавжди — лише під час boot.
+Runtime reload не підтримується (POST /api/bindings → save + restart).
+
 ## 4. PersistService — Автозбереження стану
 
 Пріоритет **CRITICAL** — ініціалізується в Phase 1 (до бізнес-модулів).
@@ -194,6 +199,12 @@ public:
 Якщо ESP32 перезавантажився через watchdog — це ознака бага.
 Якщо через brownout — проблема з живленням.
 
+**HTTP snapshot:** `GET /api/system/diagnostics` віддає одним JSON-запитом snapshot
+ресурсів (DRAM free/largest/min_free/total, PSRAM, uptime, firmware info, task HWM
+для main/ota_http/httpd/mqtt/modbus). Джерело значень — `heap_caps_get_*` та
+`uxTaskGetStackHighWaterMark`. Handler статичний, не потребує state copy — безпечно
+викликати з WebUI та зовнішніх моніторинг-тулів.
+
 ## 7. NVS Helper — утиліти для роботи з NVS
 
 `nvs_helper.h` (`namespace nvs_helper`) — обгортки над `nvs_flash` API.
@@ -214,4 +225,5 @@ public:
 
 ## Changelog
 
+- 2026-04-23 — ConfigService parse buffers BSS→heap (~9.6 KB), `/api/system/diagnostics` endpoint
 - 2026-03-01 — Оновлено пріоритети, додано NVS batch API, heap_largest, KC868-A6 parsing

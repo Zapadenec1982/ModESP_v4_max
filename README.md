@@ -56,7 +56,7 @@ Verified on ESP32 + KC868-A6 board with real refrigeration equipment:
 | State keys | 231 (178 metadata, 107 MQTT pub, 166 MQTT sub) |
 | Modules | 7 (equipment, thermostat, defrost, protection, eev, lighting, datalogger) |
 | Drivers | 11 (DS18B20, NTC, relay, digital input, PCF8574 relay/input, pressure ADC, EEV analog/stepper/PCF8574, AKV pulse) |
-| HTTP endpoints | 23 REST + WebSocket + OTA |
+| HTTP endpoints | 24 REST + WebSocket + OTA |
 | Tests | 491 (310 pytest + 181 C++ host / 418 assertions) |
 | WebUI | 83 KB gzipped (Svelte 4, dark/light theme, 4 languages) |
 | Firmware binary | ~1.3 MB firmware + 960 KB data partition |
@@ -145,7 +145,7 @@ Svelte 4 SPA — 83 KB gzipped, served from ESP32 LittleFS.
 
 - **WiFi** — STA + AP fallback, AP→STA periodic probe (30s–5min backoff), mDNS, STA watchdog
 - **MQTT** — TLS (port 8883), delta-publish, heartbeat, LWT, tenant-aware topics, Home Assistant Auto-Discovery
-- **HTTP** — 23 REST endpoints: state, settings, bindings, WiFi, OTA, logs, backup/restore
+- **HTTP** — 24 REST endpoints: state, settings, bindings, WiFi, OTA, logs, backup/restore, system diagnostics
 - **WebSocket** — real-time state broadcast, delta updates, max 3 clients
 - **Cloud** — [ModESP Cloud](https://github.com/Zapadenec1982/ModESP_Cloud) (default) or AWS IoT Core (compile-time switch)
 
@@ -251,7 +251,7 @@ components/
 ├── modesp_core/        # BaseModule, ModuleManager, SharedState, types
 ├── modesp_services/    # Error, Watchdog, Config, Persist, Logger
 ├── modesp_hal/         # HAL, DriverManager, driver interfaces
-├── modesp_net/         # WiFi, HTTP (23 endpoints), WebSocket
+├── modesp_net/         # WiFi, HTTP (24 endpoints), WebSocket
 ├── modesp_mqtt/        # MQTT client with TLS, delta-publish, HA discovery
 └── modesp_json/        # JSON serialization (jsmn-based)
 modules/
@@ -294,7 +294,7 @@ cd webui && npm install && npm run build && npm run deploy
 | Phase | Name | Status |
 |-------|------|--------|
 | 1–4 | Core Architecture, HAL, Drivers, Equipment Manager | ✅ |
-| 5 | WiFi + HTTP API (23 endpoints) + WebSocket + Code Generation | ✅ |
+| 5 | WiFi + HTTP API (24 endpoints) + WebSocket + Code Generation | ✅ |
 | 6–10 | Thermostat v2, Defrost 7-phase, NTC, DS18B20 SEARCH_ROM | ✅ |
 | 11 | MQTT + TLS, OTA with rollback, NVS persist | ✅ |
 | 12–15 | Night Setback, KC868-A6, DataLogger, Manifest Standard v2 | ✅ |

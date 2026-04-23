@@ -12,7 +12,7 @@
 |--------|-------|
 | State keys | 231 state keys (178 STATE_META entries) |
 | MQTT topics | 107 publish, 166 subscribe |
-| HTTP endpoints | 23 REST + OTA upload |
+| HTTP endpoints | 24 REST + OTA upload |
 | Modules | 7 (equipment, thermostat, defrost, protection, eev, lighting, datalogger) |
 | Drivers | 11 (DS18B20, NTC, relay, digital input, PCF8574 relay/input, pressure ADC, EEV analog/stepper/PCF8574 stepper, AKV pulse) |
 | Tests | 491 total (181 host C++ / 418 assertions + 310 pytest) |
@@ -153,7 +153,8 @@ WiFi, MQTT, HTTP, and WebSocket — all hardened for industrial environments.
 - **Exponential backoff** — reconnect delay 5s→300s on broker disconnect
 
 ### HTTP REST
-- **23 endpoints** — parameter CRUD, state queries, WiFi scan, system info, datalog, OTA
+- **24 endpoints** — parameter CRUD, state queries, WiFi scan, system info, datalog, OTA
+- **`GET /api/system/diagnostics`** — one-shot JSON with DRAM/PSRAM/uptime/firmware/task HWM (main, ota_http, httpd, mqtt, modbus)
 - **WebSocket** — real-time state push to connected browsers
 
 ---

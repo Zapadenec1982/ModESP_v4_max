@@ -13,7 +13,7 @@
 | Ключі стану | 231 (178 STATE_META, 107 MQTT publish, 166 MQTT subscribe) |
 | Модулі | 7 (equipment, thermostat, defrost, protection, eev, lighting, datalogger) |
 | Драйвери | 11 (ds18b20, ntc, relay, digital_input, pcf8574_relay/input, pressure_adc, eev_analog/stepper/pcf8574_stepper, akv_pulse) |
-| HTTP-ендпоінти | 23 REST + OTA upload |
+| HTTP-ендпоінти | 24 REST + OTA upload |
 | Тести | 491 (181 host C++ doctest / 418 assertions + 310 pytest) |
 | WebUI | 83KB gzip, Svelte 4 |
 | Прошивка | ~1.2MB binary, 77–90KB free heap |
@@ -212,7 +212,7 @@ Svelte 4 SPA, 83KB gzip, WebSocket real-time оновлення, bento card ди
 
 ## 7. Підключення
 
-WiFi STA/AP, MQTT із TLS, HTTP REST API (23 ендпоінти), WebSocket.
+WiFi STA/AP, MQTT із TLS, HTTP REST API (24 ендпоінти), WebSocket.
 
 ### WiFi
 
@@ -236,7 +236,8 @@ WiFi STA/AP, MQTT із TLS, HTTP REST API (23 ендпоінти), WebSocket.
 
 ### HTTP REST API
 
-- **23 ендпоінти** — конфігурація, стан, параметри, управління, діагностика
+- **24 ендпоінти** — конфігурація, стан, параметри, управління, діагностика
+- **`GET /api/system/diagnostics`** — одним запитом JSON з DRAM/PSRAM/uptime/firmware/task HWM (main, ota_http, httpd, mqtt, modbus)
 - **JSON API** — всі відповіді у JSON-форматі
 - **OTA upload** — завантаження прошивки через POST multipart
 - **Без автентифікації** — локальна мережа (опціонально basic auth)
@@ -323,7 +324,7 @@ idf.py menuconfig → Cloud backend → Mosquitto / AWS IoT Core
 
 ### Pytest (інтеграційні)
 
-- HTTP API тести — всі 23 ендпоінти
+- HTTP API тести — всі 24 ендпоінти
 - WebSocket-сценарії — підключення, отримання оновлень
 - MQTT-інтеграція — publish/subscribe, heartbeat
 - OTA-сценарії — upload, застосування, відкат

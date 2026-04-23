@@ -129,7 +129,7 @@ ModESP_v4_max/
 │   ├── modesp_core/          # BaseModule, ModuleManager, SharedState, types.h, message_types.h
 │   ├── modesp_services/      # ErrorService, LoggerService, ConfigService, PersistService, WatchdogService, NVS
 │   ├── modesp_hal/           # HAL, DriverManager, driver interfaces, message bus
-│   ├── modesp_net/           # WiFiService, HttpService, WsService (23 endpoints)
+│   ├── modesp_net/           # WiFiService, HttpService, WsService (24 endpoints)
 │   ├── modesp_mqtt/          # MqttService (TLS, HA Discovery, delta-publish)
 │   ├── modesp_modbus/        # Modbus RTU slave (284 input, 252 holding registers)
 │   ├── modesp_refrigerant/   # 23 refrigerants, saturation props, dew point
@@ -660,7 +660,7 @@ def test_equipment_arbitration_protection_wins():
 
 ### HTTP / WebSocket
 
-- **HTTP:** 23 REST endpoints (state, settings, OTA, logs, WiFi, MQTT config, etc.)
+- **HTTP:** 24 REST endpoints (state, settings, OTA, logs, WiFi, MQTT config, `GET /api/system/diagnostics`, etc.)
 - **WebSocket:** Real-time delta broadcasts, 1500ms interval, 20s heartbeat PING
 - **Max clients:** 3 concurrent WebSocket connections
 - **Compression:** Full state gzipped to ~3.5 KB; delta ~200 bytes

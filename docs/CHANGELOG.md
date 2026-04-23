@@ -2,6 +2,49 @@
 
 > Повний changelog проекту.
 
+## 2026-04-23
+
+### perf(heap): diagnostics endpoint + Phase 1 RAM savings (~12 KB)
+
+**Контекст:** план агресивної RAM-оптимізації (SharedState refactor) скасовано —
+вимірювання на залізі показало, що free heap насправді 58–75 KB, а не 40 KB
+як передбачав план. Зона 3 blocker не існує. Лишились тільки безпечні quick wins.
+
+**Нові можливості:**
+- feat: `GET /api/system/diagnostics` — одним запитом повертає JSON з DRAM
+  (free/largest/min_free/total), PSRAM, uptime, firmware info, task HWM
+  (main/ota_http/httpd/mqtt/modbus). Корисно для польової діагностики.
+- feat: `main.cpp` — `heap_caps_print_heap_info(MALLOC_CAP_INTERNAL)` pre-NVS-init
+  та post-init. Фіксує baseline + PSRAM free/total у UART логу для майбутніх вимірювань.
+
+**RAM-оптимізації (безпечні, без архітектурних змін):**
+- perf: `ConfigService` parse buffers (`s_json_buf` 4096 B + `s_json_tokens` 350 × 16 B
+  = 9.6 KB) перенесено з BSS у heap. `heap_caps_malloc(MALLOC_CAP_INTERNAL)` на
+  початку `on_init()`, `heap_caps_free()` перед return. Використовуються лише
+  при boot — без runtime reload. Heap при init дозволений (not hot path).
+- perf: `http_service` POST /api/bindings static buffer 4096→2048 B.
+  Реальні `bindings.json` файли: dev=541 B, kc868a6=849 B. 2 KB — запас 2×.
+- perf: `sdkconfig.defaults` — `CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=8192`
+  (default 16384). `DYNAMIC_BUFFER=y` вже увімкнений → allocate up to ceiling
+  на recv → зменшений ceiling = ~8 KB peak RX reduction під час TLS handshake.
+  Safe з усіма production брокерами (HiveMQ/AWS/Mosquitto cert chains < 6 KB,
+  MQTT payloads < 2 KB).
+
+**Скасовано (після аудиту плану vs код):**
+- Phase 1.4 (MAX_CHANGED_KEYS 32→16) — 0.5 KB не вартий зміни
+- Phase 1 mbedTLS Step B (8K→4K) — ризик broker compatibility без benefit
+- Phase 2/3/4 (SharedState rewrite до enum-indexed array) — 4–5 днів роботи
+  для неіснуючої проблеми. Free heap steady=58.8 KB, min_free=34.3 KB — healthy.
+
+**Знахідки аудиту (зафіксовано на майбутнє):**
+- Modbus коштує 17–24 KB RAM. Kconfig `CONFIG_MODESP_MODBUS_ENABLED` уже compile-time
+  disable (default n, але `sdkconfig.defaults` примусово `=y` для KC868-A6 RS-485).
+- 3 з 4 DRAM регіонів вичерпуються під час init (min_free=4). Всі нові alloc'и
+  ідуть з 111-KB регіону.
+- `etl::unordered_map` з MAX_STATE_ENTRIES=380 реально споживає ~55 KB
+  (не 13 KB). sizeof StateValue (`etl::variant`) ≈ 48 B, не 8 B.
+- Справжня кількість ключів у zone=2: 332 (не 231).
+
 ## 2026-03-31
 
 ### fix(zones): critical namespace mismatch + multi-zone hardening
